@@ -1,5 +1,7 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -84,6 +86,38 @@ pub struct CheckoutCompletedData {
     pub id: String,
     pub status: String,
     pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateFileRequest {
+    name: String,
+    mime_type: String,
+    size: i64,
+    checksum_sha256_base64: String,
+    upload: FileUploadConfig,
+}
+
+#[derive(Debug, Serialize)]
+struct FileUploadConfig {
+    service: String,
+    is_uploaded: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct FileResponse {
+    id: String,
+    upload: FileUploadInfo,
+}
+
+#[derive(Debug, Deserialize)]
+struct FileUploadInfo {
+    url: String,
+    headers: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateProductMedia {
+    medias: Vec<String>,
 }
 
 impl PolarService {
@@ -279,6 +313,126 @@ impl PolarService {
             let body = response.text().await.unwrap_or_default();
             return Err(AppError::ExternalService(format!(
                 "Polar API error {}: {}",
+                status, body
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Upload an image to a Polar product
+    pub async fn upload_product_image(
+        &self,
+        product_id: &str,
+        filename: &str,
+        mime_type: &str,
+        data: &[u8],
+    ) -> AppResult<()> {
+        // Step 1: Calculate SHA256 checksum
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        let checksum = hasher.finalize();
+        let checksum_base64 = BASE64.encode(checksum);
+
+        // Step 2: Request upload URL from Polar
+        let create_request = CreateFileRequest {
+            name: filename.to_string(),
+            mime_type: mime_type.to_string(),
+            size: data.len() as i64,
+            checksum_sha256_base64: checksum_base64.clone(),
+            upload: FileUploadConfig {
+                service: "product_media".to_string(),
+                is_uploaded: false,
+            },
+        };
+
+        let response = self
+            .client
+            .post(format!("{}/files/", POLAR_API_URL))
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .json(&create_request)
+            .send()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("Polar file API error: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::ExternalService(format!(
+                "Polar file create error {}: {}",
+                status, body
+            )));
+        }
+
+        let file_response: FileResponse = response
+            .json()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("Failed to parse file response: {}", e)))?;
+
+        // Step 3: Upload file to S3 with checksum header
+        let mut upload_request = self
+            .client
+            .put(&file_response.upload.url)
+            .header("Content-Type", mime_type)
+            .header("x-amz-checksum-sha256", &checksum_base64);
+
+        // Add any additional headers from Polar
+        for (key, value) in &file_response.upload.headers {
+            upload_request = upload_request.header(key, value);
+        }
+
+        let upload_response = upload_request
+            .body(data.to_vec())
+            .send()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("S3 upload error: {}", e)))?;
+
+        if !upload_response.status().is_success() {
+            let status = upload_response.status();
+            let body = upload_response.text().await.unwrap_or_default();
+            return Err(AppError::ExternalService(format!(
+                "S3 upload error {}: {}",
+                status, body
+            )));
+        }
+
+        // Step 4: Mark file as uploaded
+        let complete_response = self
+            .client
+            .post(format!("{}/files/{}/uploaded", POLAR_API_URL, file_response.id))
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .send()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("Polar file complete error: {}", e)))?;
+
+        if !complete_response.status().is_success() {
+            let status = complete_response.status();
+            let body = complete_response.text().await.unwrap_or_default();
+            return Err(AppError::ExternalService(format!(
+                "Polar file complete error {}: {}",
+                status, body
+            )));
+        }
+
+        // Step 5: Attach media to product
+        let media_request = UpdateProductMedia {
+            medias: vec![file_response.id],
+        };
+
+        let product_response = self
+            .client
+            .patch(format!("{}/products/{}", POLAR_API_URL, product_id))
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .json(&media_request)
+            .send()
+            .await
+            .map_err(|e| AppError::ExternalService(format!("Polar product update error: {}", e)))?;
+
+        if !product_response.status().is_success() {
+            let status = product_response.status();
+            let body = product_response.text().await.unwrap_or_default();
+            return Err(AppError::ExternalService(format!(
+                "Polar product media update error {}: {}",
                 status, body
             )));
         }

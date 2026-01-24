@@ -204,25 +204,37 @@ async fn upload_image(
             .map(|s| s.to_string())
             .unwrap_or_else(|| "image.jpg".to_string());
 
-        let content_type = field.content_type().map(|s| s.to_string());
+        let content_type = field
+            .content_type()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "image/jpeg".to_string());
 
         // Validate content type
-        if let Some(ref ct) = content_type {
-            if !ct.starts_with("image/") {
-                return Err(AppError::BadRequest("Only image files are allowed".to_string()));
-            }
+        if !content_type.starts_with("image/") {
+            return Err(AppError::BadRequest("Only image files are allowed".to_string()));
         }
 
         let data = field.bytes().await.map_err(|e| {
             AppError::BadRequest(format!("Failed to read upload: {}", e))
         })?;
 
-        // Upload to storage
+        // Upload to storage (R2/local)
         let path = state
             .storage
             .upload(&filename, &data)
             .await
             .map_err(|e| AppError::Storage(e.to_string()))?;
+
+        // Sync image to Polar if product is linked
+        if let Some(polar_product_id) = &product.polar_product_id {
+            if let Err(e) = state
+                .polar
+                .upload_product_image(polar_product_id, &filename, &content_type, &data)
+                .await
+            {
+                tracing::warn!("Failed to sync image to Polar: {}", e);
+            }
+        }
 
         // Update product with new image path
         let updated = Product::set_image(&conn, &id, &path).await?;
