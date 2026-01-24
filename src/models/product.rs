@@ -15,6 +15,8 @@ pub struct Product {
     pub is_active: bool,
     pub created_at: String,
     pub updated_at: String,
+    pub polar_price_id: Option<String>,
+    pub polar_product_id: Option<String>,
 }
 
 impl Product {
@@ -33,6 +35,8 @@ impl Product {
             is_active: row.get::<i32>(6)? != 0,
             created_at: row.get(7)?,
             updated_at: row.get(8)?,
+            polar_price_id: row.get(9)?,
+            polar_product_id: row.get(10)?,
         })
     }
 }
@@ -53,6 +57,7 @@ pub struct UpdateProduct {
     pub image_path: Option<String>,
     pub stock_quantity: Option<i32>,
     pub is_active: Option<bool>,
+    pub polar_price_id: Option<String>,
 }
 
 impl Product {
@@ -122,6 +127,7 @@ impl Product {
         let image_path = data.image_path.or(current.image_path);
         let stock_quantity = data.stock_quantity.unwrap_or(current.stock_quantity);
         let is_active = data.is_active.unwrap_or(current.is_active) as i32;
+        let polar_price_id = data.polar_price_id.or(current.polar_price_id);
 
         conn.execute(
             r#"
@@ -132,10 +138,11 @@ impl Product {
                 image_path = ?,
                 stock_quantity = ?,
                 is_active = ?,
+                polar_price_id = ?,
                 updated_at = datetime('now')
             WHERE id = ?
             "#,
-            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, id.to_string()],
+            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, polar_price_id, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;
@@ -149,6 +156,24 @@ impl Product {
         conn.execute(
             "UPDATE products SET image_path = ?, updated_at = datetime('now') WHERE id = ?",
             libsql::params![image_path.to_string(), id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Self::find_by_id(conn, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Product not found".to_string()))
+    }
+
+    pub async fn set_polar_ids(
+        conn: &Connection,
+        id: &str,
+        polar_product_id: &str,
+        polar_price_id: &str,
+    ) -> AppResult<Self> {
+        conn.execute(
+            "UPDATE products SET polar_product_id = ?, polar_price_id = ?, updated_at = datetime('now') WHERE id = ?",
+            libsql::params![polar_product_id.to_string(), polar_price_id.to_string(), id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

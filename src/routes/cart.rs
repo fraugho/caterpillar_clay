@@ -92,12 +92,22 @@ async fn create_checkout(
     // Create Polar checkout session
     let success_url = format!("{}/orders/{}?success=true", state.config.base_url, order.id);
 
-    // For now, use a placeholder product price ID
-    // In production, this would come from your Polar dashboard
+    // Get the first product's polar_price_id for checkout
+    // Note: For multi-item orders, we use the first product's price as the checkout item
+    // The full order details are tracked in our database
+    let first_item = payload.items.first().unwrap();
+    let first_product = Product::find_by_id(&conn, &first_item.product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    let polar_price_id = first_product.polar_price_id.ok_or_else(|| {
+        AppError::BadRequest("Product not configured for checkout. Please contact support.".to_string())
+    })?;
+
     let checkout = state
         .polar
         .create_checkout(
-            "price_placeholder",
+            &polar_price_id,
             &success_url,
             Some(&user.email),
             order.uuid().unwrap_or_default(),

@@ -20,6 +20,8 @@ pub struct AdminProductResponse {
     pub image_url: Option<String>,
     pub stock_quantity: i32,
     pub is_active: bool,
+    pub polar_product_id: Option<String>,
+    pub polar_price_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -44,6 +46,8 @@ impl AdminProductResponse {
             image_url,
             stock_quantity: product.stock_quantity,
             is_active: product.is_active,
+            polar_product_id: product.polar_product_id,
+            polar_price_id: product.polar_price_id,
             created_at: product.created_at,
             updated_at: product.updated_at,
         }
@@ -89,7 +93,27 @@ async fn create_product(
     Json(payload): Json<CreateProduct>,
 ) -> AppResult<Json<AdminProductResponse>> {
     let conn = state.db.connect().map_err(AppError::from)?;
-    let product = Product::create(&conn, payload).await?;
+
+    // Extract values for Polar sync before moving payload
+    let name = payload.name.clone();
+    let description = payload.description.clone();
+    let price_cents = payload.price_cents;
+
+    let mut product = Product::create(&conn, payload).await?;
+
+    // Sync to Polar
+    match state
+        .polar
+        .create_product(&name, description.as_deref(), price_cents)
+        .await
+    {
+        Ok((polar_product_id, polar_price_id)) => {
+            product = Product::set_polar_ids(&conn, &product.id, &polar_product_id, &polar_price_id).await?;
+        }
+        Err(e) => {
+            tracing::warn!("Failed to sync product to Polar: {}", e);
+        }
+    }
 
     Ok(Json(AdminProductResponse::from_product(product, &state)))
 }
@@ -101,12 +125,27 @@ async fn update_product(
 ) -> AppResult<Json<AdminProductResponse>> {
     let conn = state.db.connect().map_err(AppError::from)?;
 
-    // Verify product exists
-    Product::find_by_id(&conn, &id)
+    // Verify product exists and get current state
+    let current = Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
+    // Extract values for Polar sync
+    let name_update = payload.name.clone();
+    let desc_update = payload.description.clone();
+
     let product = Product::update(&conn, &id, payload).await?;
+
+    // Sync to Polar if product is linked
+    if let Some(polar_product_id) = &current.polar_product_id {
+        if let Err(e) = state
+            .polar
+            .update_product(polar_product_id, name_update.as_deref(), desc_update.as_deref())
+            .await
+        {
+            tracing::warn!("Failed to sync product update to Polar: {}", e);
+        }
+    }
 
     Ok(Json(AdminProductResponse::from_product(product, &state)))
 }
@@ -122,9 +161,16 @@ async fn delete_product(
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
-    // Delete image if exists
+    // Delete image from storage if exists
     if let Some(image_path) = &product.image_path {
         let _ = state.storage.delete(image_path).await;
+    }
+
+    // Archive in Polar if linked
+    if let Some(polar_product_id) = &product.polar_product_id {
+        if let Err(e) = state.polar.archive_product(polar_product_id).await {
+            tracing::warn!("Failed to archive product in Polar: {}", e);
+        }
     }
 
     Product::delete(&conn, &id).await?;
