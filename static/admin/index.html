@@ -8,67 +8,111 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Press Start 2P', cursive; background: #1a1a2e; color: #eee; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        nav { background: #16213e; padding: 20px; border-bottom: 4px solid #8b5e3c; margin-bottom: 20px; }
-        nav .inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
-        nav h1 { font-size: 14px; color: #8b5e3c; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-        .tab { background: #16213e; color: #888; padding: 12px 16px; font-family: inherit; font-size: 8px; border: none; cursor: pointer; }
-        .tab.active { background: #8b5e3c; color: #fff; }
-        .tab:hover { background: #0f3460; color: #fff; }
-        .card { background: #16213e; padding: 20px; margin-bottom: 20px; border: 2px solid #0f3460; }
-        .card h2 { font-size: 12px; margin-bottom: 16px; color: #8b5e3c; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
-        .stat { background: #0f3460; padding: 16px; text-align: center; }
-        .stat-value { font-size: 18px; color: #22c55e; margin-bottom: 8px; }
-        .stat-label { font-size: 8px; color: #888; }
-        table { width: 100%; border-collapse: collapse; font-size: 8px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #0f3460; }
-        th { color: #8b5e3c; }
-        .btn { background: #8b5e3c; color: #fff; padding: 8px 12px; font-family: inherit; font-size: 8px; border: none; cursor: pointer; }
-        .btn:hover { background: #6b4e2c; }
-        .btn-danger { background: #dc2626; }
-        .btn-danger:hover { background: #b91c1c; }
-        .btn-success { background: #16a34a; }
-        .btn-sm { padding: 4px 8px; font-size: 6px; }
-        input, textarea, select { width: 100%; padding: 10px; font-family: inherit; font-size: 8px; margin-bottom: 12px; background: #0f3460; color: #eee; border: 1px solid #16213e; }
-        input:focus, textarea:focus, select:focus { outline: none; border-color: #8b5e3c; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        label { display: block; font-size: 8px; margin-bottom: 4px; color: #888; }
-        .status { padding: 4px 8px; font-size: 6px; border-radius: 2px; }
-        .status-pending { background: #eab308; color: #000; }
-        .status-paid { background: #22c55e; color: #000; }
-        .status-processing { background: #3b82f6; color: #fff; }
-        .status-shipped { background: #8b5cf6; color: #fff; }
-        .status-delivered { background: #10b981; color: #fff; }
-        .status-cancelled { background: #ef4444; color: #fff; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.active { display: flex; }
-        .modal-content { background: #16213e; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .modal-header h3 { font-size: 10px; color: #8b5e3c; }
-        .close-btn { background: none; border: none; color: #888; font-size: 16px; cursor: pointer; }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-        .product-card { background: #0f3460; padding: 12px; }
-        .product-card img { width: 100%; height: 100px; object-fit: cover; background: #1a1a2e; margin-bottom: 8px; }
-        .product-card h4 { font-size: 8px; margin-bottom: 4px; }
-        .product-card .price { color: #22c55e; font-size: 10px; margin-bottom: 8px; }
-        .product-card .stock { font-size: 6px; color: #888; }
-        .product-actions { display: flex; gap: 4px; margin-top: 8px; }
-        .alert { padding: 12px; margin-bottom: 16px; font-size: 8px; }
-        .alert-warning { background: #fef3c7; color: #92400e; }
-        .alert-success { background: #d1fae5; color: #065f46; }
-        .toggle { position: relative; display: inline-block; width: 40px; height: 20px; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #0f3460; transition: .3s; }
-        .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #888; transition: .3s; }
-        .toggle input:checked + .toggle-slider { background: #22c55e; }
-        .toggle input:checked + .toggle-slider:before { transform: translateX(20px); background: #fff; }
+        :root{
+            --bg-primary:#F8F8F8;
+            --bg-secondary:#FFFFFF;
+            --bg-card:#FFFFFF;
+            --text-primary:#18191B;
+            --text-secondary:#666666;
+            --accent:#97BAD9;
+            --accent-hover:#7BA3C9;
+            --border:#E0E0E0;
+        }
+        @media(prefers-color-scheme:dark){
+            :root{
+                --bg-primary:#18191B;
+                --bg-secondary:#1E2022;
+                --bg-card:#252729;
+                --text-primary:#F8F8F8;
+                --text-secondary:#A0A0A0;
+                --accent:#97BAD9;
+                --accent-hover:#AECCE8;
+                --border:#333537;
+            }
+        }
+        *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
+        body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;position:relative}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+        .star{position:absolute;background:var(--accent);opacity:0.3}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        @keyframes twinkle{0%,100%{opacity:0.15}50%{opacity:0.4}}
+        .container{max-width:1200px;margin:0 auto;padding:20px;position:relative;z-index:1}
+        nav{background:var(--accent);padding:20px;margin-bottom:20px;position:relative;z-index:1}
+        nav .inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+        nav h1{font-size:14px;color:#18191B}
+        .tabs{display:flex;gap:8px;margin-bottom:20px}
+        .tab{background:var(--bg-card);color:var(--text-secondary);padding:12px 16px;font-family:inherit;font-size:8px;border:2px solid var(--border);border-radius:8px;cursor:pointer}
+        .tab.active{background:var(--accent);color:#18191B;border-color:var(--accent)}
+        .tab:hover{border-color:var(--accent)}
+        .card{background:var(--bg-card);padding:20px;margin-bottom:20px;border:2px solid var(--border);border-radius:12px}
+        .card h2{font-size:12px;margin-bottom:16px;color:var(--accent)}
+        .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+        .stat{background:var(--bg-card);padding:16px;text-align:center;border:2px solid var(--border);border-radius:12px}
+        .stat-value{font-size:18px;color:var(--accent);margin-bottom:8px}
+        .stat-label{font-size:8px;color:var(--text-secondary)}
+        table{width:100%;border-collapse:collapse;font-size:8px}
+        th,td{padding:12px;text-align:left;border-bottom:1px solid var(--border)}
+        th{color:var(--accent)}
+        .btn{background:var(--accent);color:#18191B;padding:10px 14px;font-family:inherit;font-size:8px;border:none;cursor:pointer;border-radius:8px;transition:background .2s}
+        .btn:hover{background:var(--accent-hover)}
+        .btn-danger{background:#dc2626;color:#fff}
+        .btn-danger:hover{background:#b91c1c}
+        .btn-success{background:#16a34a;color:#fff}
+        .btn-sm{padding:6px 10px;font-size:6px;border-radius:6px}
+        input,textarea,select{width:100%;padding:10px;font-family:inherit;font-size:8px;margin-bottom:12px;background:var(--bg-secondary);color:var(--text-primary);border:2px solid var(--border);border-radius:8px}
+        input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        label{display:block;font-size:8px;margin-bottom:4px;color:var(--text-secondary)}
+        .status{padding:4px 8px;font-size:6px;border-radius:6px}
+        .status-pending{background:#eab308;color:#000}
+        .status-paid{background:#22c55e;color:#000}
+        .status-processing{background:#3b82f6;color:#fff}
+        .status-shipped{background:#8b5cf6;color:#fff}
+        .status-delivered{background:#10b981;color:#fff}
+        .status-cancelled{background:#ef4444;color:#fff}
+        .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center}
+        .modal.active{display:flex}
+        .modal-content{background:var(--bg-card);padding:24px;max-width:900px;width:90%;max-height:90vh;overflow-y:auto;border-radius:12px;border:2px solid var(--border)}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .modal-header h3{font-size:10px;color:var(--accent)}
+        .close-btn{background:none;border:none;color:var(--text-secondary);font-size:16px;cursor:pointer}
+        .product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px}
+        .product-card{background:var(--bg-card);padding:20px;border:2px solid var(--border);border-radius:12px;text-align:center;transition:transform .2s,box-shadow .2s}
+        .product-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+        .product-card img,.product-card .placeholder-img{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);margin-bottom:12px;border:2px solid var(--border);border-radius:8px}
+        .product-card .placeholder-img{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-secondary)}
+        .product-card h4{font-size:10px;margin-bottom:10px}
+        .product-card .price{color:var(--accent);font-size:12px;margin-bottom:10px}
+        .product-card .stock{font-size:8px;color:var(--text-secondary);margin-bottom:14px}
+        .product-actions{display:flex;gap:8px;margin-top:12px;justify-content:center}
+        .alert{padding:12px;margin-bottom:16px;font-size:8px;border-radius:8px}
+        .alert-warning{background:#fef3c7;color:#92400e}
+        .alert-success{background:#d1fae5;color:#065f46}
+        .toggle{position:relative;display:inline-block;width:40px;height:20px}
+        .toggle input{opacity:0;width:0;height:0}
+        .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);transition:.3s;border-radius:10px}
+        .toggle-slider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:var(--text-secondary);transition:.3s;border-radius:50%}
+        .toggle input:checked+.toggle-slider{background:#22c55e}
+        .toggle input:checked+.toggle-slider:before{transform:translateX(20px);background:#fff}
+        .preview-section{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+        .form-section,.preview-card{padding:20px}
+        .preview-card{background:var(--bg-secondary);border:2px solid var(--border);border-radius:12px;text-align:center}
+        .preview-card h4{font-size:10px;margin-bottom:10px}
+        .preview-card .price{color:var(--accent);font-size:12px;margin-bottom:10px}
+        .preview-card .stock{font-size:8px;color:var(--text-secondary);margin-bottom:14px}
+        .preview-card img,.preview-card .preview-placeholder{width:100%;height:300px;object-fit:cover;background:var(--bg-primary);border:2px solid var(--border);border-radius:8px;margin-bottom:12px}
+        .preview-card .preview-placeholder{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-secondary)}
+        .preview-btn{background:var(--accent);color:#18191B;padding:14px 20px;font-family:inherit;font-size:8px;border:none;border-radius:8px;width:100%}
+        .image-upload{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s}
+        .image-upload:hover{border-color:var(--accent)}
+        .image-upload input{display:none}
+        .image-upload img{max-width:100%;max-height:200px;margin-top:12px;border-radius:8px}
+        @media(max-width:768px){.preview-section{grid-template-columns:1fr}}
     </style>
 </head>
 <body x-data="admin()">
+    <div class="stars" id="stars"></div>
+
     <nav>
         <div class="inner">
             <h1>CATERPILLAR CLAY ADMIN</h1>
@@ -121,7 +165,7 @@
                         <tbody>
                             <template x-for="o in dashboard.recent_orders || []" :key="o.id">
                                 <tr>
-                                    <td x-text="o.id"></td>
+                                    <td x-text="o.id.substring(0,8)"></td>
                                     <td><span class="status" :class="'status-' + o.status" x-text="o.status.toUpperCase()"></span></td>
                                     <td>$<span x-text="o.total.toFixed(2)"></span></td>
                                     <td x-text="new Date(o.created_at).toLocaleDateString()"></td>
@@ -143,11 +187,16 @@
                 <div class="product-grid">
                     <template x-for="p in products" :key="p.id">
                         <div class="product-card">
-                            <img :src="p.image_url || '/static/placeholder.png'" :alt="p.name">
+                            <template x-if="p.image_url">
+                                <img :src="p.image_url" :alt="p.name">
+                            </template>
+                            <template x-if="!p.image_url">
+                                <div class="placeholder-img">[NO IMAGE]</div>
+                            </template>
                             <h4 x-text="p.name"></h4>
                             <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
-                            <div class="stock">Stock: <span x-text="p.stock_quantity"></span></div>
-                            <div style="margin-top: 4px;">
+                            <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
+                            <div style="margin-top: 8px;">
                                 <label class="toggle">
                                     <input type="checkbox" :checked="p.is_active" @change="toggleProductActive(p)">
                                     <span class="toggle-slider"></span>
@@ -210,42 +259,60 @@
                 <h3 x-text="editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'"></h3>
                 <button class="close-btn" @click="showProductModal = false">&times;</button>
             </div>
-            <form @submit.prevent="saveProduct()">
-                <label>Name</label>
-                <input type="text" x-model="productForm.name" required>
-
-                <label>Description</label>
-                <textarea x-model="productForm.description" rows="3"></textarea>
-
-                <div class="form-row">
-                    <div>
-                        <label>Price (cents)</label>
-                        <input type="number" x-model="productForm.price_cents" required>
-                    </div>
-                    <div>
-                        <label>Stock</label>
-                        <input type="number" x-model="productForm.stock_quantity">
-                    </div>
-                </div>
-
-                <template x-if="editingProduct">
-                    <div>
+            <div class="preview-section">
+                <div class="form-section">
+                    <form @submit.prevent="saveProduct()">
                         <label>Product Image</label>
-                        <input type="file" @change="uploadImage($event)" accept="image/*">
-                        <template x-if="editingProduct.image_url">
-                            <img :src="editingProduct.image_url" style="max-width: 100px; margin-top: 8px;">
-                        </template>
-                    </div>
-                </template>
+                        <div class="image-upload" @click="$refs.imageInput.click()">
+                            <input type="file" x-ref="imageInput" @change="handleImageSelect($event)" accept="image/*">
+                            <template x-if="!previewImage">
+                                <p style="font-size:8px;color:var(--text-secondary)">Click to upload image</p>
+                            </template>
+                            <template x-if="previewImage">
+                                <img :src="previewImage" alt="Preview">
+                            </template>
+                        </div>
 
-                <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">SAVE</button>
-            </form>
+                        <label>Name</label>
+                        <input type="text" x-model="productForm.name" required>
+
+                        <label>Description</label>
+                        <textarea x-model="productForm.description" rows="3"></textarea>
+
+                        <div class="form-row">
+                            <div>
+                                <label>Price ($)</label>
+                                <input type="number" step="0.01" x-model="productForm.price" required>
+                            </div>
+                            <div>
+                                <label>Stock</label>
+                                <input type="number" x-model="productForm.stock_quantity">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">SAVE PRODUCT</button>
+                    </form>
+                </div>
+                <div class="preview-card">
+                    <p style="font-size:8px;color:var(--text-secondary);margin-bottom:12px">LISTING PREVIEW</p>
+                    <template x-if="previewImage">
+                        <img :src="previewImage" alt="Preview">
+                    </template>
+                    <template x-if="!previewImage">
+                        <div class="preview-placeholder">[IMAGE]</div>
+                    </template>
+                    <h4 x-text="productForm.name || 'Product Name'"></h4>
+                    <div class="price">$<span x-text="(parseFloat(productForm.price) || 0).toFixed(2)"></span></div>
+                    <div class="stock" x-text="productForm.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></div>
+                    <button class="preview-btn" disabled>ADD TO CART</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Order Detail Modal -->
     <div class="modal" :class="{ active: showOrderModal }">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:500px">
             <div class="modal-header">
                 <h3>ORDER DETAILS</h3>
                 <button class="close-btn" @click="showOrderModal = false">&times;</button>
@@ -258,7 +325,7 @@
 
                     <template x-if="selectedOrder.shipping_address">
                         <div style="margin-bottom: 12px;">
-                            <p style="font-size: 8px; color: #8b5e3c; margin-bottom: 4px;">SHIPPING ADDRESS</p>
+                            <p style="font-size: 8px; color: var(--accent); margin-bottom: 4px;">SHIPPING ADDRESS</p>
                             <p style="font-size: 8px;" x-text="selectedOrder.shipping_address.name"></p>
                             <p style="font-size: 8px;" x-text="selectedOrder.shipping_address.street"></p>
                             <p style="font-size: 8px;" x-text="`${selectedOrder.shipping_address.city}, ${selectedOrder.shipping_address.state} ${selectedOrder.shipping_address.zip}`"></p>
@@ -269,7 +336,7 @@
                         <p style="font-size: 8px; margin-bottom: 8px;"><strong>Tracking:</strong> <span x-text="selectedOrder.tracking_number"></span></p>
                     </template>
 
-                    <p style="font-size: 8px; color: #8b5e3c; margin: 12px 0 4px;">ITEMS</p>
+                    <p style="font-size: 8px; color: var(--accent); margin: 12px 0 4px;">ITEMS</p>
                     <template x-for="item in selectedOrder.items" :key="item.product_id">
                         <p style="font-size: 8px; margin-bottom: 4px;">
                             <span x-text="item.product_name"></span> x<span x-text="item.quantity"></span> - $<span x-text="(item.price_cents / 100).toFixed(2)"></span>
@@ -282,7 +349,7 @@
 
     <!-- Tracking Modal -->
     <div class="modal" :class="{ active: showTrackingModal }">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:400px">
             <div class="modal-header">
                 <h3>ADD TRACKING</h3>
                 <button class="close-btn" @click="showTrackingModal = false">&times;</button>
@@ -300,6 +367,23 @@
     </div>
 
     <script>
+        // Generate pixel stars
+        (function generateStars(){
+            const container=document.getElementById('stars');
+            const sizes=[2,3,4,6,8];
+            for(let i=0;i<40;i++){
+                const star=document.createElement('div');
+                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                const size=sizes[Math.floor(Math.random()*sizes.length)];
+                star.style.width=size+'px';
+                star.style.height=size+'px';
+                star.style.left=Math.random()*100+'%';
+                star.style.top=Math.random()*100+'%';
+                star.style.animationDelay=Math.random()*2+'s';
+                container.appendChild(star);
+            }
+        })();
+
         function admin() {
             return {
                 tab: 'dashboard',
@@ -312,8 +396,10 @@
                 editingProduct: null,
                 selectedOrder: null,
                 trackingOrderId: null,
-                productForm: { name: '', description: '', price_cents: 0, stock_quantity: 0 },
+                productForm: { name: '', description: '', price: 0, stock_quantity: 0 },
                 trackingForm: { tracking_number: '', carrier: '' },
+                previewImage: null,
+                selectedFile: null,
 
                 async init() {
                     await this.loadDashboard();
@@ -348,7 +434,9 @@
 
                 openProductModal() {
                     this.editingProduct = null;
-                    this.productForm = { name: '', description: '', price_cents: 0, stock_quantity: 0 };
+                    this.productForm = { name: '', description: '', price: 0, stock_quantity: 0 };
+                    this.previewImage = null;
+                    this.selectedFile = null;
                     this.showProductModal = true;
                 },
 
@@ -357,26 +445,66 @@
                     this.productForm = {
                         name: product.name,
                         description: product.description || '',
-                        price_cents: product.price_cents,
+                        price: product.price,
                         stock_quantity: product.stock_quantity
                     };
+                    this.previewImage = product.image_url || null;
+                    this.selectedFile = null;
                     this.showProductModal = true;
+                },
+
+                handleImageSelect(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    this.selectedFile = file;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.previewImage = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
                 },
 
                 async saveProduct() {
                     try {
-                        const url = this.editingProduct
-                            ? `/admin/api/products/${this.editingProduct.id}`
-                            : '/admin/api/products';
-                        const method = this.editingProduct ? 'PUT' : 'POST';
+                        const price_cents = Math.round(parseFloat(this.productForm.price) * 100);
+                        const productData = {
+                            name: this.productForm.name,
+                            description: this.productForm.description,
+                            price_cents: price_cents,
+                            stock_quantity: parseInt(this.productForm.stock_quantity) || 0
+                        };
 
-                        await fetch(url, {
-                            method,
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(this.productForm)
-                        });
+                        let productId = this.editingProduct?.id;
+
+                        if (this.editingProduct) {
+                            await fetch(`/admin/api/products/${productId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(productData)
+                            });
+                        } else {
+                            const res = await fetch('/admin/api/products', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(productData)
+                            });
+                            const created = await res.json();
+                            productId = created.id;
+                        }
+
+                        // Upload image if selected
+                        if (this.selectedFile && productId) {
+                            const formData = new FormData();
+                            formData.append('file', this.selectedFile);
+                            await fetch(`/admin/api/products/${productId}/image`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        }
 
                         this.showProductModal = false;
+                        this.previewImage = null;
+                        this.selectedFile = null;
                         await this.loadProducts();
                     } catch (e) {
                         console.error('Failed to save product:', e);
@@ -403,26 +531,6 @@
                         await this.loadProducts();
                     } catch (e) {
                         console.error('Failed to delete product:', e);
-                    }
-                },
-
-                async uploadImage(event) {
-                    const file = event.target.files[0];
-                    if (!file || !this.editingProduct) return;
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    try {
-                        const res = await fetch(`/admin/api/products/${this.editingProduct.id}/image`, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        const updated = await res.json();
-                        this.editingProduct.image_url = updated.image_url;
-                        await this.loadProducts();
-                    } catch (e) {
-                        console.error('Failed to upload image:', e);
                     }
                 },
 
@@ -465,7 +573,6 @@
                 },
 
                 logout() {
-                    // Handle Clerk logout
                     window.location.href = '/';
                 }
             };
