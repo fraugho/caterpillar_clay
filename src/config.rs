@@ -15,6 +15,11 @@ pub struct Config {
     pub from_email: String,
     pub storage_type: String,
     pub upload_dir: String,
+    pub r2_bucket: Option<String>,
+    pub r2_account_id: Option<String>,
+    pub r2_access_key: Option<String>,
+    pub r2_secret_key: Option<String>,
+    pub r2_public_url: Option<String>,
     pub base_url: String,
     pub port: u16,
     pub testing_mode: bool,
@@ -37,6 +42,11 @@ impl Config {
                 .unwrap_or_else(|_| "orders@caterpillarclay.com".to_string()),
             storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
             upload_dir: env::var("UPLOAD_DIR").unwrap_or_else(|_| "./static/uploads".to_string()),
+            r2_bucket: env::var("R2_BUCKET").ok(),
+            r2_account_id: env::var("R2_ACCOUNT_ID").ok(),
+            r2_access_key: env::var("R2_ACCESS_KEY").ok(),
+            r2_secret_key: env::var("R2_SECRET_KEY").ok(),
+            r2_public_url: env::var("R2_PUBLIC_URL").ok(),
             base_url: env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string()),
             port: env::var("PORT")
                 .unwrap_or_else(|_| "3000".to_string())

@@ -8,7 +8,6 @@ use serde::Serialize;
 use crate::error::{AppError, AppResult};
 use crate::models::{CreateProduct, Product, UpdateProduct};
 use crate::routes::AppState;
-use crate::storage::StorageBackend;
 
 #[derive(Serialize)]
 pub struct AdminProductResponse {
@@ -26,12 +25,12 @@ pub struct AdminProductResponse {
 }
 
 impl AdminProductResponse {
-    fn from_product(product: Product, base_url: &str) -> Self {
+    fn from_product(product: Product, state: &AppState) -> Self {
         let image_url = product.image_path.clone().map(|p| {
             if p.starts_with("http") {
                 p
             } else {
-                format!("{}{}", base_url, p)
+                state.storage.public_url(&p)
             }
         });
 
@@ -67,7 +66,7 @@ async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<Admi
 
     let responses: Vec<AdminProductResponse> = products
         .into_iter()
-        .map(|p| AdminProductResponse::from_product(p, &state.config.base_url))
+        .map(|p| AdminProductResponse::from_product(p, &state))
         .collect();
 
     Ok(Json(responses))
@@ -82,10 +81,7 @@ async fn get_product(
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
-    Ok(Json(AdminProductResponse::from_product(
-        product,
-        &state.config.base_url,
-    )))
+    Ok(Json(AdminProductResponse::from_product(product, &state)))
 }
 
 async fn create_product(
@@ -95,10 +91,7 @@ async fn create_product(
     let conn = state.db.connect().map_err(AppError::from)?;
     let product = Product::create(&conn, payload).await?;
 
-    Ok(Json(AdminProductResponse::from_product(
-        product,
-        &state.config.base_url,
-    )))
+    Ok(Json(AdminProductResponse::from_product(product, &state)))
 }
 
 async fn update_product(
@@ -115,10 +108,7 @@ async fn update_product(
 
     let product = Product::update(&conn, &id, payload).await?;
 
-    Ok(Json(AdminProductResponse::from_product(
-        product,
-        &state.config.base_url,
-    )))
+    Ok(Json(AdminProductResponse::from_product(product, &state)))
 }
 
 async fn delete_product(
@@ -191,10 +181,7 @@ async fn upload_image(
         // Update product with new image path
         let updated = Product::set_image(&conn, &id, &path).await?;
 
-        return Ok(Json(AdminProductResponse::from_product(
-            updated,
-            &state.config.base_url,
-        )));
+        return Ok(Json(AdminProductResponse::from_product(updated, &state)));
     }
 
     Err(AppError::BadRequest("No file uploaded".to_string()))

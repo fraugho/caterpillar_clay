@@ -21,12 +21,12 @@ pub struct ProductResponse {
 }
 
 impl ProductResponse {
-    fn from_product(product: Product, base_url: &str) -> Self {
+    fn from_product(product: Product, state: &AppState) -> Self {
         let image_url = product.image_path.map(|p| {
             if p.starts_with("http") {
                 p
             } else {
-                format!("{}{}", base_url, p)
+                state.storage.public_url(&p)
             }
         });
 
@@ -54,7 +54,7 @@ async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<Prod
 
     let responses: Vec<ProductResponse> = products
         .into_iter()
-        .map(|p| ProductResponse::from_product(p, &state.config.base_url))
+        .map(|p| ProductResponse::from_product(p, &state))
         .collect();
 
     Ok(Json(responses))
@@ -73,8 +73,5 @@ async fn get_product(
         return Err(AppError::NotFound("Product not found".to_string()));
     }
 
-    Ok(Json(ProductResponse::from_product(
-        product,
-        &state.config.base_url,
-    )))
+    Ok(Json(ProductResponse::from_product(product, &state)))
 }

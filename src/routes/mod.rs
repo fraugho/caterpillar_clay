@@ -15,7 +15,7 @@ use tower_http::trace::TraceLayer;
 use crate::config::Config;
 use crate::middleware::auth::auth_middleware;
 use crate::services::{ClerkService, EasyPostService, EmailService, PolarService};
-use crate::storage::LocalStorage;
+use crate::storage::StorageBackend;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -25,7 +25,7 @@ pub struct AppState {
     pub polar: PolarService,
     pub easypost: EasyPostService,
     pub email: Option<EmailService>,
-    pub storage: Arc<LocalStorage>,
+    pub storage: Arc<dyn StorageBackend>,
 }
 
 pub fn create_router(state: AppState) -> Router {

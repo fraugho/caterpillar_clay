@@ -11,6 +11,7 @@ A full-stack e-commerce application for a pottery shop built with Rust (Axum) ba
 | Cloudflare | Add rate limiting rule | Dashboard → Security → WAF → Rate Limiting |
 | Cloudflare | Enable cache rules for images | Dashboard → Caching → Cache Rules |
 | Turso | Nothing needed | Already stops at free tier |
+| Cloudflare R2 | Nothing needed | Free tier: 10GB storage, 10M reads/month |
 
 ## Architecture
 
@@ -26,7 +27,7 @@ A full-stack e-commerce application for a pottery shop built with Rust (Axum) ba
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │   Routes    │  │  Services   │  │   Storage   │             │
 │  │  /api/*     │  │  - Clerk    │  │  - Local    │             │
-│  │  /admin/*   │  │  - Polar    │  │  - S3 (fut) │             │
+│  │  /admin/*   │  │  - Polar    │  │  - R2       │             │
 │  │  /webhooks  │  │  - EasyPost │  │             │             │
 │  └─────────────┘  │  - Email    │  └─────────────┘             │
 │                   └─────────────┘                               │
@@ -49,7 +50,8 @@ A full-stack e-commerce application for a pottery shop built with Rust (Axum) ba
 ## Tech Stack
 
 - **Backend**: Rust with Axum web framework
-- **Database**: libsql (SQLite compatible, Turso ready)
+- **Database**: libsql/Turso (SQLite compatible, edge-ready)
+- **Storage**: Cloudflare R2 (S3-compatible)
 - **Authentication**: Clerk
 - **Payments**: Polar.sh
 - **Shipping**: EasyPost
@@ -87,7 +89,7 @@ clay/
 │   │   ├── polar.rs        # Payments
 │   │   ├── easypost.rs     # Shipping
 │   │   └── email.rs        # Notifications
-│   ├── storage/            # File storage
+│   ├── storage/            # File storage (Local/R2)
 │   └── middleware/         # Auth middleware
 ├── static/
 │   ├── index.html          # Main storefront
@@ -144,6 +146,17 @@ SMTP_HOST=smtp.resend.com
 SMTP_USER=resend
 SMTP_PASS=re_xxxxx
 FROM_EMAIL=orders@yourdomain.com
+
+# Storage (local or r2)
+STORAGE_TYPE=local
+UPLOAD_DIR=./static/uploads
+
+# Cloudflare R2 (when STORAGE_TYPE=r2)
+# R2_BUCKET=your-bucket-name
+# R2_ACCOUNT_ID=your-cloudflare-account-id
+# R2_ACCESS_KEY=your-r2-access-key
+# R2_SECRET_KEY=your-r2-secret-key
+# R2_PUBLIC_URL=https://pub-xxx.r2.dev
 
 # Server config
 BASE_URL=http://localhost:3000

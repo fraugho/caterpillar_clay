@@ -14,7 +14,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::config::Config;
 use crate::routes::{create_router, AppState};
 use crate::services::{ClerkService, EasyPostService, EmailService, PolarService};
-use crate::storage::LocalStorage;
+use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,8 +62,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Initialize storage
-    let storage = Arc::new(LocalStorage::new(&config.upload_dir, &config.base_url));
-    storage.ensure_dir().await.expect("Failed to create upload directory");
+    let storage: Arc<dyn StorageBackend> = if config.storage_type == "r2" {
+        match (&config.r2_bucket, &config.r2_account_id, &config.r2_access_key, &config.r2_secret_key, &config.r2_public_url) {
+            (Some(bucket), Some(account_id), Some(access_key), Some(secret_key), Some(public_url)) => {
+                tracing::info!("Using R2 storage");
+                Arc::new(R2Storage::new(bucket, account_id, access_key, secret_key, public_url)
+                    .expect("Failed to initialize R2 storage"))
+            }
+            _ => {
+                tracing::warn!("R2 storage configured but missing credentials, falling back to local");
+                let local = LocalStorage::new(&config.upload_dir, &config.base_url);
+                local.ensure_dir().await.expect("Failed to create upload directory");
+                Arc::new(local)
+            }
+        }
+    } else {
+        tracing::info!("Using local storage");
+        let local = LocalStorage::new(&config.upload_dir, &config.base_url);
+        local.ensure_dir().await.expect("Failed to create upload directory");
+        Arc::new(local)
+    };
 
     // Create app state
     let state = AppState {
