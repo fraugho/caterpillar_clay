@@ -6,7 +6,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::{CreateUser, User};
 use crate::routes::AppState;
 use crate::services::clerk::ClerkService;
@@ -34,15 +34,17 @@ async fn auth_callback(
                 .unwrap_or_else(|| "unknown@example.com".to_string());
             let name = ClerkService::get_full_name(&clerk_user);
 
-            let _ = User::upsert(
-                &state.pool,
-                CreateUser {
-                    clerk_id: clerk_user.id,
-                    email,
-                    name,
-                },
-            )
-            .await;
+            if let Ok(conn) = state.db.connect() {
+                let _ = User::upsert(
+                    &conn,
+                    CreateUser {
+                        clerk_id: clerk_user.id,
+                        email,
+                        name,
+                    },
+                )
+                .await;
+            }
         }
     }
 
@@ -64,8 +66,9 @@ async fn sync_user(
         .unwrap_or_else(|| "unknown@example.com".to_string());
     let name = ClerkService::get_full_name(&clerk_user);
 
+    let conn = state.db.connect().map_err(AppError::from)?;
     let user = User::upsert(
-        &state.pool,
+        &conn,
         CreateUser {
             clerk_id: clerk_user.id,
             email,

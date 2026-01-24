@@ -41,12 +41,14 @@ async fn create_checkout(
         return Err(AppError::BadRequest("Cart is empty".to_string()));
     }
 
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     // Calculate total and validate products
     let mut total_cents = 0i32;
     let mut order_items: Vec<CreateOrderItem> = Vec::new();
 
     for item in &payload.items {
-        let product = Product::find_by_id(&state.pool, &item.product_id)
+        let product = Product::find_by_id(&conn, &item.product_id)
             .await?
             .ok_or_else(|| AppError::NotFound(format!("Product {} not found", item.product_id)))?;
 
@@ -76,7 +78,7 @@ async fn create_checkout(
 
     // Create order in pending state
     let order = Order::create(
-        &state.pool,
+        &conn,
         CreateOrder {
             user_id: Some(user.id.clone()),
             total_cents,

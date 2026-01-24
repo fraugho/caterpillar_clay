@@ -62,7 +62,8 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<AdminProductResponse>>> {
-    let products = Product::list_all(&state.pool).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let products = Product::list_all(&conn).await?;
 
     let responses: Vec<AdminProductResponse> = products
         .into_iter()
@@ -76,7 +77,8 @@ async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<AdminProductResponse>> {
-    let product = Product::find_by_id(&state.pool, &id)
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let product = Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
@@ -90,7 +92,8 @@ async fn create_product(
     State(state): State<AppState>,
     Json(payload): Json<CreateProduct>,
 ) -> AppResult<Json<AdminProductResponse>> {
-    let product = Product::create(&state.pool, payload).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let product = Product::create(&conn, payload).await?;
 
     Ok(Json(AdminProductResponse::from_product(
         product,
@@ -103,12 +106,14 @@ async fn update_product(
     Path(id): Path<String>,
     Json(payload): Json<UpdateProduct>,
 ) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     // Verify product exists
-    Product::find_by_id(&state.pool, &id)
+    Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
-    let product = Product::update(&state.pool, &id, payload).await?;
+    let product = Product::update(&conn, &id, payload).await?;
 
     Ok(Json(AdminProductResponse::from_product(
         product,
@@ -120,8 +125,10 @@ async fn delete_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     // Verify product exists
-    let product = Product::find_by_id(&state.pool, &id)
+    let product = Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
@@ -130,7 +137,7 @@ async fn delete_product(
         let _ = state.storage.delete(image_path).await;
     }
 
-    Product::delete(&state.pool, &id).await?;
+    Product::delete(&conn, &id).await?;
 
     Ok(Json(serde_json::json!({"deleted": true})))
 }
@@ -140,8 +147,10 @@ async fn upload_image(
     Path(id): Path<String>,
     mut multipart: Multipart,
 ) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     // Verify product exists
-    let product = Product::find_by_id(&state.pool, &id)
+    let product = Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
@@ -180,7 +189,7 @@ async fn upload_image(
             .map_err(|e| AppError::Storage(e.to_string()))?;
 
         // Update product with new image path
-        let updated = Product::set_image(&state.pool, &id, &path).await?;
+        let updated = Product::set_image(&conn, &id, &path).await?;
 
         return Ok(Json(AdminProductResponse::from_product(
             updated,

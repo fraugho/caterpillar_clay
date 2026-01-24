@@ -4,20 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7", features = ["multipart"] }
-tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "uuid", "chrono", "json"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["json"] }
-jsonwebtoken = "9"
-dotenvy = "0.15"
-thiserror = "1"
-async-trait = "0.1"
-lettre = { version = "0.11", features = ["tokio1-native-tls"] }
+axum = { version = "0.8.8", features = ["multipart"] }
+tokio = { version = "1.49.0", features = ["full"] }
+libsql = "0.9.29"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tower = "0.5.3"
+tower-http = { version = "0.6.8", features = ["cors", "fs", "trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+uuid = { version = "1.19.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.43", features = ["serde"] }
+reqwest = { version = "0.13.1", features = ["json"] }
+jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
+dotenvy = "0.15.7"
+thiserror = "2.0.18"
+async-trait = "0.1.89"
+lettre = { version = "0.11.19", features = ["tokio1-native-tls"] }

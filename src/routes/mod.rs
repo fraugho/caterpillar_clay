@@ -6,7 +6,7 @@ pub mod products;
 pub mod webhooks;
 
 use axum::{middleware, Router};
-use sqlx::SqlitePool;
+use libsql::Database;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -19,7 +19,7 @@ use crate::storage::LocalStorage;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: SqlitePool,
+    pub db: Arc<Database>,
     pub config: Config,
     pub clerk: ClerkService,
     pub polar: PolarService,
@@ -37,9 +37,13 @@ pub fn create_router(state: AppState) -> Router {
     let protected_routes = Router::new()
         .merge(orders::routes())
         .merge(cart::routes())
-        .layer(middleware::from_fn_with_state(state.pool.clone(), auth_middleware));
+        .layer(middleware::from_fn_with_state(state.db.clone(), auth_middleware));
 
-    let admin_routes = admin::routes(state.pool.clone());
+    let admin_routes = admin::routes(state.db.clone(), state.config.testing_mode);
+
+    if state.config.testing_mode {
+        tracing::warn!("⚠️  TESTING MODE ENABLED - Admin auth is disabled!");
+    }
 
     Router::new()
         .nest("/api", public_routes)

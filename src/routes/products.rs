@@ -49,7 +49,8 @@ pub fn public_routes() -> Router<AppState> {
 }
 
 async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<ProductResponse>>> {
-    let products = Product::list_active(&state.pool).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let products = Product::list_active(&conn).await?;
 
     let responses: Vec<ProductResponse> = products
         .into_iter()
@@ -63,7 +64,8 @@ async fn get_product(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<ProductResponse>> {
-    let product = Product::find_by_id(&state.pool, &id)
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let product = Product::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 

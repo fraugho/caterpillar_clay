@@ -33,10 +33,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration
     let config = Config::from_env().expect("Failed to load configuration");
 
-    // Create database pool
-    let pool = db::create_pool(&config.database_url)
+    // Create database connection
+    let db = db::create_database(&config.database_url)
         .await
-        .expect("Failed to create database pool");
+        .expect("Failed to create database");
 
     tracing::info!("Connected to database");
 
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create app state
     let state = AppState {
-        pool,
+        db: Arc::new(db),
         config: config.clone(),
         clerk,
         polar,

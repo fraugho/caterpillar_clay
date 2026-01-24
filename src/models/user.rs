@@ -1,10 +1,10 @@
+use libsql::Connection;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, SqlitePool};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub clerk_id: String,
@@ -19,6 +19,18 @@ impl User {
     pub fn uuid(&self) -> Option<Uuid> {
         Uuid::parse_str(&self.id).ok()
     }
+
+    fn from_row(row: &libsql::Row) -> Result<Self, libsql::Error> {
+        Ok(Self {
+            id: row.get(0)?,
+            clerk_id: row.get(1)?,
+            email: row.get(2)?,
+            name: row.get(3)?,
+            is_admin: row.get::<i32>(4)? != 0,
+            created_at: row.get(5)?,
+            updated_at: row.get(6)?,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,80 +41,70 @@ pub struct CreateUser {
 }
 
 impl User {
-    pub async fn find_by_clerk_id(pool: &SqlitePool, clerk_id: &str) -> AppResult<Option<Self>> {
-        sqlx::query_as::<_, Self>("SELECT * FROM users WHERE clerk_id = ?")
-            .bind(clerk_id)
-            .fetch_optional(pool)
+    pub async fn find_by_clerk_id(conn: &Connection, clerk_id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM users WHERE clerk_id = ?", [clerk_id])
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
     }
 
-    pub async fn find_by_id(pool: &SqlitePool, id: &str) -> AppResult<Option<Self>> {
-        sqlx::query_as::<_, Self>("SELECT * FROM users WHERE id = ?")
-            .bind(id)
-            .fetch_optional(pool)
+    pub async fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM users WHERE id = ?", [id])
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
     }
 
-    pub async fn create(pool: &SqlitePool, data: CreateUser) -> AppResult<Self> {
+    pub async fn create(conn: &Connection, data: CreateUser) -> AppResult<Self> {
         let id = Uuid::new_v4().to_string();
-        sqlx::query(
-            r#"
-            INSERT INTO users (id, clerk_id, email, name)
-            VALUES (?, ?, ?, ?)
-            "#,
+        conn.execute(
+            "INSERT INTO users (id, clerk_id, email, name) VALUES (?, ?, ?, ?)",
+            libsql::params![id.clone(), data.clerk_id.clone(), data.email.clone(), data.name.clone()],
         )
-        .bind(&id)
-        .bind(&data.clerk_id)
-        .bind(&data.email)
-        .bind(&data.name)
-        .execute(pool)
         .await
         .map_err(AppError::from)?;
 
-        Self::find_by_id(pool, &id)
+        Self::find_by_id(conn, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Failed to create user".to_string()))
     }
 
-    pub async fn upsert(pool: &SqlitePool, data: CreateUser) -> AppResult<Self> {
-        if let Some(existing) = Self::find_by_clerk_id(pool, &data.clerk_id).await? {
-            sqlx::query(
-                r#"
-                UPDATE users SET email = ?, name = ?, updated_at = datetime('now')
-                WHERE clerk_id = ?
-                "#,
+    pub async fn upsert(conn: &Connection, data: CreateUser) -> AppResult<Self> {
+        if let Some(existing) = Self::find_by_clerk_id(conn, &data.clerk_id).await? {
+            conn.execute(
+                "UPDATE users SET email = ?, name = ?, updated_at = datetime('now') WHERE clerk_id = ?",
+                libsql::params![data.email.clone(), data.name.clone(), data.clerk_id.clone()],
             )
-            .bind(&data.email)
-            .bind(&data.name)
-            .bind(&data.clerk_id)
-            .execute(pool)
             .await
             .map_err(AppError::from)?;
 
-            Self::find_by_id(pool, &existing.id)
+            Self::find_by_id(conn, &existing.id)
                 .await?
                 .ok_or_else(|| AppError::Internal("Failed to update user".to_string()))
         } else {
-            Self::create(pool, data).await
+            Self::create(conn, data).await
         }
     }
 
-    pub async fn set_admin(pool: &SqlitePool, id: &str, is_admin: bool) -> AppResult<Self> {
-        sqlx::query(
-            r#"
-            UPDATE users SET is_admin = ?, updated_at = datetime('now')
-            WHERE id = ?
-            "#,
+    pub async fn set_admin(conn: &Connection, id: &str, is_admin: bool) -> AppResult<Self> {
+        conn.execute(
+            "UPDATE users SET is_admin = ?, updated_at = datetime('now') WHERE id = ?",
+            libsql::params![is_admin as i32, id.to_string()],
         )
-        .bind(is_admin)
-        .bind(id)
-        .execute(pool)
         .await
         .map_err(AppError::from)?;
 
-        Self::find_by_id(pool, id)
+        Self::find_by_id(conn, id)
             .await?
             .ok_or_else(|| AppError::NotFound("User not found".to_string()))
     }

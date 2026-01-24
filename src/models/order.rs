@@ -1,5 +1,5 @@
+use libsql::Connection;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, SqlitePool};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
@@ -50,7 +50,7 @@ pub struct ShippingAddress {
     pub country: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: String,
     pub user_id: Option<String>,
@@ -64,13 +64,42 @@ pub struct Order {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+impl Order {
+    fn from_row(row: &libsql::Row) -> Result<Self, libsql::Error> {
+        Ok(Self {
+            id: row.get(0)?,
+            user_id: row.get(1)?,
+            status: row.get(2)?,
+            total_cents: row.get(3)?,
+            shipping_address: row.get(4)?,
+            tracking_number: row.get(5)?,
+            easypost_tracker_id: row.get(6)?,
+            polar_checkout_id: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderItem {
     pub id: String,
     pub order_id: String,
     pub product_id: String,
     pub quantity: i32,
     pub price_cents: i32,
+}
+
+impl OrderItem {
+    fn from_row(row: &libsql::Row) -> Result<Self, libsql::Error> {
+        Ok(Self {
+            id: row.get(0)?,
+            order_id: row.get(1)?,
+            product_id: row.get(2)?,
+            quantity: row.get(3)?,
+            price_cents: row.get(4)?,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,107 +131,106 @@ impl Order {
         OrderStatus::from_str(&self.status)
     }
 
-    pub async fn find_by_id(pool: &SqlitePool, id: &str) -> AppResult<Option<Self>> {
-        sqlx::query_as::<_, Self>("SELECT * FROM orders WHERE id = ?")
-            .bind(id)
-            .fetch_optional(pool)
+    pub async fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM orders WHERE id = ?", [id])
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
     }
 
-    pub async fn find_by_polar_checkout(pool: &SqlitePool, checkout_id: &str) -> AppResult<Option<Self>> {
-        sqlx::query_as::<_, Self>("SELECT * FROM orders WHERE polar_checkout_id = ?")
-            .bind(checkout_id)
-            .fetch_optional(pool)
+    pub async fn find_by_polar_checkout(conn: &Connection, checkout_id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM orders WHERE polar_checkout_id = ?", [checkout_id])
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
     }
 
-    pub async fn list_by_user(pool: &SqlitePool, user_id: &str) -> AppResult<Vec<Self>> {
-        sqlx::query_as::<_, Self>(
-            "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
-        )
-        .bind(user_id)
-        .fetch_all(pool)
-        .await
-        .map_err(AppError::from)
-    }
-
-    pub async fn list_all(pool: &SqlitePool) -> AppResult<Vec<Self>> {
-        sqlx::query_as::<_, Self>("SELECT * FROM orders ORDER BY created_at DESC")
-            .fetch_all(pool)
+    pub async fn list_by_user(conn: &Connection, user_id: &str) -> AppResult<Vec<Self>> {
+        let mut rows = conn
+            .query(
+                "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+                [user_id],
+            )
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from)?;
+
+        let mut orders = Vec::new();
+        while let Some(row) = rows.next().await.map_err(AppError::from)? {
+            orders.push(Self::from_row(&row).map_err(AppError::from)?);
+        }
+        Ok(orders)
     }
 
-    pub async fn create(pool: &SqlitePool, data: CreateOrder) -> AppResult<Self> {
+    pub async fn list_all(conn: &Connection) -> AppResult<Vec<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM orders ORDER BY created_at DESC", ())
+            .await
+            .map_err(AppError::from)?;
+
+        let mut orders = Vec::new();
+        while let Some(row) = rows.next().await.map_err(AppError::from)? {
+            orders.push(Self::from_row(&row).map_err(AppError::from)?);
+        }
+        Ok(orders)
+    }
+
+    pub async fn create(conn: &Connection, data: CreateOrder) -> AppResult<Self> {
         let id = Uuid::new_v4().to_string();
         let shipping_json = serde_json::to_string(&data.shipping_address)
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO orders (id, user_id, total_cents, shipping_address, polar_checkout_id)
-            VALUES (?, ?, ?, ?, ?)
-            "#,
+        conn.execute(
+            "INSERT INTO orders (id, user_id, total_cents, shipping_address, polar_checkout_id) VALUES (?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.polar_checkout_id.clone()],
         )
-        .bind(&id)
-        .bind(&data.user_id)
-        .bind(data.total_cents)
-        .bind(&shipping_json)
-        .bind(&data.polar_checkout_id)
-        .execute(pool)
         .await
         .map_err(AppError::from)?;
 
         for item in data.items {
             let item_id = Uuid::new_v4().to_string();
-            sqlx::query(
-                r#"
-                INSERT INTO order_items (id, order_id, product_id, quantity, price_cents)
-                VALUES (?, ?, ?, ?, ?)
-                "#,
+            conn.execute(
+                "INSERT INTO order_items (id, order_id, product_id, quantity, price_cents) VALUES (?, ?, ?, ?, ?)",
+                libsql::params![item_id, id.clone(), item.product_id, item.quantity, item.price_cents],
             )
-            .bind(&item_id)
-            .bind(&id)
-            .bind(&item.product_id)
-            .bind(item.quantity)
-            .bind(item.price_cents)
-            .execute(pool)
             .await
             .map_err(AppError::from)?;
         }
 
-        Self::find_by_id(pool, &id)
+        Self::find_by_id(conn, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Failed to create order".to_string()))
     }
 
-    pub async fn update_status(pool: &SqlitePool, id: &str, status: OrderStatus) -> AppResult<Self> {
-        sqlx::query(
-            r#"
-            UPDATE orders SET status = ?, updated_at = datetime('now')
-            WHERE id = ?
-            "#,
+    pub async fn update_status(conn: &Connection, id: &str, status: OrderStatus) -> AppResult<Self> {
+        conn.execute(
+            "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?",
+            libsql::params![status.as_str().to_string(), id.to_string()],
         )
-        .bind(status.as_str())
-        .bind(id)
-        .execute(pool)
         .await
         .map_err(AppError::from)?;
 
-        Self::find_by_id(pool, id)
+        Self::find_by_id(conn, id)
             .await?
             .ok_or_else(|| AppError::NotFound("Order not found".to_string()))
     }
 
     pub async fn set_tracking(
-        pool: &SqlitePool,
+        conn: &Connection,
         id: &str,
         tracking_number: &str,
         easypost_tracker_id: Option<&str>,
     ) -> AppResult<Self> {
-        sqlx::query(
+        conn.execute(
             r#"
             UPDATE orders SET
                 tracking_number = ?,
@@ -211,42 +239,59 @@ impl Order {
                 updated_at = datetime('now')
             WHERE id = ?
             "#,
+            libsql::params![tracking_number.to_string(), easypost_tracker_id.map(|s| s.to_string()), id.to_string()],
         )
-        .bind(tracking_number)
-        .bind(easypost_tracker_id)
-        .bind(id)
-        .execute(pool)
         .await
         .map_err(AppError::from)?;
 
-        Self::find_by_id(pool, id)
+        Self::find_by_id(conn, id)
             .await?
             .ok_or_else(|| AppError::NotFound("Order not found".to_string()))
     }
 
-    pub async fn get_items(pool: &SqlitePool, order_id: &str) -> AppResult<Vec<OrderItem>> {
-        sqlx::query_as::<_, OrderItem>("SELECT * FROM order_items WHERE order_id = ?")
-            .bind(order_id)
-            .fetch_all(pool)
-            .await
-            .map_err(AppError::from)
-    }
-
-    pub async fn count_all(pool: &SqlitePool) -> AppResult<i64> {
-        let row: (i32,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
-            .fetch_one(pool)
+    pub async fn get_items(conn: &Connection, order_id: &str) -> AppResult<Vec<OrderItem>> {
+        let mut rows = conn
+            .query("SELECT * FROM order_items WHERE order_id = ?", [order_id])
             .await
             .map_err(AppError::from)?;
-        Ok(row.0 as i64)
+
+        let mut items = Vec::new();
+        while let Some(row) = rows.next().await.map_err(AppError::from)? {
+            items.push(OrderItem::from_row(&row).map_err(AppError::from)?);
+        }
+        Ok(items)
     }
 
-    pub async fn total_revenue(pool: &SqlitePool) -> AppResult<i64> {
-        let row: (Option<i64>,) = sqlx::query_as(
-            "SELECT SUM(total_cents) FROM orders WHERE status NOT IN ('pending', 'cancelled')",
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(AppError::from)?;
-        Ok(row.0.unwrap_or(0))
+    pub async fn count_all(conn: &Connection) -> AppResult<i64> {
+        let mut rows = conn
+            .query("SELECT COUNT(*) FROM orders", ())
+            .await
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => {
+                let count: i32 = row.get(0).map_err(AppError::from)?;
+                Ok(count as i64)
+            }
+            None => Ok(0),
+        }
+    }
+
+    pub async fn total_revenue(conn: &Connection) -> AppResult<i64> {
+        let mut rows = conn
+            .query(
+                "SELECT SUM(total_cents) FROM orders WHERE status NOT IN ('pending', 'cancelled')",
+                (),
+            )
+            .await
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => {
+                let total: Option<i64> = row.get(0).map_err(AppError::from)?;
+                Ok(total.unwrap_or(0))
+            }
+            None => Ok(0),
+        }
     }
 }

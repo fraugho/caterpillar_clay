@@ -41,27 +41,38 @@ async fn polar_webhook(
 
     tracing::info!("Received Polar webhook: {}", event.event_type);
 
+    let conn = match state.db.connect() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Database connection error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error"})),
+            );
+        }
+    };
+
     match event.event_type.as_str() {
         "checkout.completed" => {
             if let Some(checkout_id) = event.data.get("id").and_then(|v| v.as_str()) {
-                match Order::find_by_polar_checkout(&state.pool, checkout_id).await {
+                match Order::find_by_polar_checkout(&conn, checkout_id).await {
                     Ok(Some(order)) => {
                         // Update order status to paid
-                        if let Err(e) = Order::update_status(&state.pool, &order.id, OrderStatus::Paid).await {
+                        if let Err(e) = Order::update_status(&conn, &order.id, OrderStatus::Paid).await {
                             tracing::error!("Failed to update order status: {}", e);
                         }
 
                         // Decrement stock
-                        if let Ok(items) = Order::get_items(&state.pool, &order.id).await {
+                        if let Ok(items) = Order::get_items(&conn, &order.id).await {
                             for item in items {
-                                let _ = Product::decrement_stock(&state.pool, &item.product_id, item.quantity).await;
+                                let _ = Product::decrement_stock(&conn, &item.product_id, item.quantity).await;
                             }
                         }
 
                         // Send confirmation email
                         if let Some(ref email_service) = state.email {
                             if let Some(ref user_id) = order.user_id {
-                                if let Ok(Some(user)) = User::find_by_id(&state.pool, user_id).await {
+                                if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
                                     let name = user.name.as_deref().unwrap_or("Customer");
                                     let _ = email_service
                                         .send_order_confirmation(&user.email, &order, name)
@@ -112,10 +123,18 @@ async fn easypost_webhook(
 
     tracing::info!("Received EasyPost webhook: {}", event.description);
 
+    let conn = match state.db.connect() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Database connection error: {}", e);
+            return (StatusCode::OK, Json(json!({"received": true})));
+        }
+    };
+
     let tracker = &event.result;
 
     // Find order by tracker ID
-    let orders = match Order::list_all(&state.pool).await {
+    let orders = match Order::list_all(&conn).await {
         Ok(o) => o,
         Err(e) => {
             tracing::error!("Database error: {}", e);
@@ -135,7 +154,7 @@ async fn easypost_webhook(
         };
 
         if let Some(status) = new_status {
-            if let Err(e) = Order::update_status(&state.pool, &order.id, status).await {
+            if let Err(e) = Order::update_status(&conn, &order.id, status).await {
                 tracing::error!("Failed to update order status: {}", e);
             } else {
                 tracing::info!("Order {} status updated to {:?}", order.id, status);
@@ -144,7 +163,7 @@ async fn easypost_webhook(
                 if status == OrderStatus::Delivered {
                     if let Some(ref email_service) = state.email {
                         if let Some(ref user_id) = order.user_id {
-                            if let Ok(Some(user)) = User::find_by_id(&state.pool, user_id).await {
+                            if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
                                 let name = user.name.as_deref().unwrap_or("Customer");
                                 let _ = email_service
                                     .send_order_delivered(&user.email, &order, name)

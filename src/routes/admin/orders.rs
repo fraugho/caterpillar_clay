@@ -3,6 +3,7 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
+use libsql::Connection;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
@@ -59,12 +60,13 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn list_orders(State(state): State<AppState>) -> AppResult<Json<Vec<AdminOrderResponse>>> {
-    let orders = Order::list_all(&state.pool).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let orders = Order::list_all(&conn).await?;
 
     let mut responses = Vec::new();
     for order in orders {
         let user_info = if let Some(ref user_id) = order.user_id {
-            User::find_by_id(&state.pool, user_id)
+            User::find_by_id(&conn, user_id)
                 .await?
                 .map(|u| OrderUserInfo {
                     id: u.id,
@@ -75,7 +77,7 @@ async fn list_orders(State(state): State<AppState>) -> AppResult<Json<Vec<AdminO
             None
         };
 
-        let items = build_order_items(&state, &order.id).await?;
+        let items = build_order_items(&conn, &order.id).await?;
 
         responses.push(AdminOrderResponse {
             id: order.id.clone(),
@@ -99,12 +101,13 @@ async fn get_order(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<AdminOrderResponse>> {
-    let order = Order::find_by_id(&state.pool, &id)
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let order = Order::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
 
     let user_info = if let Some(ref user_id) = order.user_id {
-        User::find_by_id(&state.pool, user_id)
+        User::find_by_id(&conn, user_id)
             .await?
             .map(|u| OrderUserInfo {
                 id: u.id,
@@ -115,7 +118,7 @@ async fn get_order(
         None
     };
 
-    let items = build_order_items(&state, &order.id).await?;
+    let items = build_order_items(&conn, &order.id).await?;
 
     Ok(Json(AdminOrderResponse {
         id: order.id.clone(),
@@ -137,13 +140,15 @@ async fn update_status(
     Path(id): Path<String>,
     Json(payload): Json<UpdateStatusRequest>,
 ) -> AppResult<Json<AdminOrderResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     let status = OrderStatus::from_str(&payload.status)
         .ok_or_else(|| AppError::BadRequest("Invalid status".to_string()))?;
 
-    let order = Order::update_status(&state.pool, &id, status).await?;
+    let order = Order::update_status(&conn, &id, status).await?;
 
     let user_info = if let Some(ref user_id) = order.user_id {
-        User::find_by_id(&state.pool, user_id)
+        User::find_by_id(&conn, user_id)
             .await?
             .map(|u| OrderUserInfo {
                 id: u.id,
@@ -154,7 +159,7 @@ async fn update_status(
         None
     };
 
-    let items = build_order_items(&state, &order.id).await?;
+    let items = build_order_items(&conn, &order.id).await?;
 
     Ok(Json(AdminOrderResponse {
         id: order.id.clone(),
@@ -176,8 +181,10 @@ async fn add_tracking(
     Path(id): Path<String>,
     Json(payload): Json<AddTrackingRequest>,
 ) -> AppResult<Json<AdminOrderResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
     // Verify order exists
-    Order::find_by_id(&state.pool, &id)
+    Order::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
 
@@ -188,13 +195,13 @@ async fn add_tracking(
         .await?;
 
     // Update order with tracking info
-    let order = Order::set_tracking(&state.pool, &id, &payload.tracking_number, Some(&tracker.id))
+    let order = Order::set_tracking(&conn, &id, &payload.tracking_number, Some(&tracker.id))
         .await?;
 
     // Send shipping notification email
     if let Some(ref email_service) = state.email {
         if let Some(ref user_id) = order.user_id {
-            if let Ok(Some(user)) = User::find_by_id(&state.pool, user_id).await {
+            if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
                 let name = user.name.as_deref().unwrap_or("Customer");
                 let _ = email_service
                     .send_order_shipped(&user.email, &order, name, &payload.tracking_number)
@@ -204,7 +211,7 @@ async fn add_tracking(
     }
 
     let user_info = if let Some(ref user_id) = order.user_id {
-        User::find_by_id(&state.pool, user_id)
+        User::find_by_id(&conn, user_id)
             .await?
             .map(|u| OrderUserInfo {
                 id: u.id,
@@ -215,7 +222,7 @@ async fn add_tracking(
         None
     };
 
-    let items = build_order_items(&state, &order.id).await?;
+    let items = build_order_items(&conn, &order.id).await?;
 
     Ok(Json(AdminOrderResponse {
         id: order.id.clone(),
@@ -233,14 +240,14 @@ async fn add_tracking(
 }
 
 async fn build_order_items(
-    state: &AppState,
+    conn: &Connection,
     order_id: &str,
 ) -> AppResult<Vec<AdminOrderItemResponse>> {
-    let items = Order::get_items(&state.pool, order_id).await?;
+    let items = Order::get_items(conn, order_id).await?;
     let mut responses = Vec::new();
 
     for item in items {
-        let product_name = match Product::find_by_id(&state.pool, &item.product_id).await? {
+        let product_name = match Product::find_by_id(conn, &item.product_id).await? {
             Some(p) => p.name,
             None => "Unknown Product".to_string(),
         };

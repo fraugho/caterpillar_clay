@@ -41,12 +41,13 @@ async fn list_orders(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<Json<Vec<OrderResponse>>> {
-    let orders = Order::list_by_user(&state.pool, &user.id).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let orders = Order::list_by_user(&conn, &user.id).await?;
 
     let mut responses = Vec::new();
     for order in orders {
-        let items = Order::get_items(&state.pool, &order.id).await?;
-        let item_responses = build_item_responses(&state, items).await?;
+        let items = Order::get_items(&conn, &order.id).await?;
+        let item_responses = build_item_responses(&conn, items).await?;
 
         responses.push(OrderResponse {
             id: order.id.clone(),
@@ -68,7 +69,8 @@ async fn get_order(
     Extension(user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> AppResult<Json<OrderResponse>> {
-    let order = Order::find_by_id(&state.pool, &id)
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let order = Order::find_by_id(&conn, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
 
@@ -77,8 +79,8 @@ async fn get_order(
         return Err(AppError::Forbidden("Access denied".to_string()));
     }
 
-    let items = Order::get_items(&state.pool, &order.id).await?;
-    let item_responses = build_item_responses(&state, items).await?;
+    let items = Order::get_items(&conn, &order.id).await?;
+    let item_responses = build_item_responses(&conn, items).await?;
 
     Ok(Json(OrderResponse {
         id: order.id.clone(),
@@ -93,13 +95,13 @@ async fn get_order(
 }
 
 async fn build_item_responses(
-    state: &AppState,
+    conn: &libsql::Connection,
     items: Vec<OrderItem>,
 ) -> AppResult<Vec<OrderItemResponse>> {
     let mut responses = Vec::new();
 
     for item in items {
-        let product_name = match Product::find_by_id(&state.pool, &item.product_id).await? {
+        let product_name = match Product::find_by_id(conn, &item.product_id).await? {
             Some(p) => p.name,
             None => "Unknown Product".to_string(),
         };

@@ -2,12 +2,22 @@
 
 A full-stack e-commerce application for a pottery shop built with Rust (Axum) backend and HTMX/Alpine.js frontend.
 
+## TODO - Cloud Service Setup
+
+| Service | Task | Link/Notes |
+|---------|------|------------|
+| Google Cloud | Set $1 budget alert | https://console.cloud.google.com/billing/budgets |
+| Google Cloud | (Optional) Set up auto-disable | Requires Pub/Sub + Cloud Function |
+| Cloudflare | Add rate limiting rule | Dashboard → Security → WAF → Rate Limiting |
+| Cloudflare | Enable cache rules for images | Dashboard → Caching → Cache Rules |
+| Turso | Nothing needed | Already stops at free tier |
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                   Frontend (HTMX + Alpine.js)                   │
-│                   catepillar_clay.html                          │
+│                         index.html                              │
 └─────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
@@ -24,7 +34,7 @@ A full-stack e-commerce application for a pottery shop built with Rust (Axum) ba
          │                │                    │
          ▼                ▼                    ▼
 ┌──────────────┐  ┌──────────────┐    ┌──────────────┐
-│  PostgreSQL  │  │    Clerk     │    │   EasyPost   │
+│ libsql/Turso │  │    Clerk     │    │   EasyPost   │
 │   Database   │  │    (Auth)    │    │  (Shipping)  │
 └──────────────┘  └──────────────┘    └──────────────┘
                          │
@@ -39,7 +49,7 @@ A full-stack e-commerce application for a pottery shop built with Rust (Axum) ba
 ## Tech Stack
 
 - **Backend**: Rust with Axum web framework
-- **Database**: SQLite with sqlx
+- **Database**: libsql (SQLite compatible, Turso ready)
 - **Authentication**: Clerk
 - **Payments**: Polar.sh
 - **Shipping**: EasyPost
@@ -57,7 +67,8 @@ clay/
 │   ├── 001_create_users.sql
 │   ├── 002_create_products.sql
 │   ├── 003_create_orders.sql
-│   └── 004_create_order_items.sql
+│   ├── 004_create_order_items.sql
+│   └── 005_seed_products.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -79,11 +90,11 @@ clay/
 │   ├── storage/            # File storage
 │   └── middleware/         # Auth middleware
 ├── static/
+│   ├── index.html          # Main storefront
 │   ├── uploads/            # Product images
 │   └── admin/
 │       └── index.html      # Admin panel
-├── templates/emails/       # Email templates
-└── catepillar_clay.html    # Main storefront
+└── templates/emails/       # Email templates
 ```
 
 ## Setup
@@ -91,7 +102,6 @@ clay/
 ### Prerequisites
 
 - Rust (latest stable)
-- SQLite 3 (usually pre-installed on most systems)
 - External service accounts (optional for development):
   - Clerk (authentication)
   - Polar.sh (payments)
@@ -101,7 +111,7 @@ clay/
 ### 1. Clone and Configure
 
 ```bash
-cd /home/black/code/web/clay
+cd clay
 
 # Create environment file
 cp .env.example .env
@@ -110,8 +120,12 @@ cp .env.example .env
 Edit `.env` with your configuration:
 
 ```bash
-# Database (SQLite - created automatically)
-DATABASE_URL=sqlite:./caterpillar_clay.db?mode=rwc
+# Database (libsql - local SQLite or Turso)
+# For local SQLite:
+DATABASE_URL=./caterpillar_clay.db
+# For Turso (when ready):
+# DATABASE_URL=libsql://your-database.turso.io
+# TURSO_AUTH_TOKEN=your_auth_token
 
 # For auth (get from clerk.com)
 CLERK_SECRET_KEY=sk_test_xxxxx
@@ -134,6 +148,9 @@ FROM_EMAIL=orders@yourdomain.com
 # Server config
 BASE_URL=http://localhost:3000
 PORT=3000
+
+# Testing (set to true to bypass admin auth)
+TESTING_MODE=false
 ```
 
 ### 2. Set Up Database
@@ -141,12 +158,6 @@ PORT=3000
 ```bash
 # Run all migrations (creates the database file automatically)
 for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
-
-# Add some test products
-sqlite3 caterpillar_clay.db "INSERT INTO products (id, name, description, price_cents, stock_quantity, is_active) VALUES
-('prod-1', 'Caterpillar Mug', 'A cute ceramic mug', 2400, 10, 1),
-('prod-2', 'Cocoon Vase', 'Elegant handmade vase', 3600, 5, 1),
-('prod-3', 'Leaf Bowl', 'Nature-inspired bowl', 2800, 8, 1);"
 ```
 
 ### 3. Build and Run
@@ -168,12 +179,13 @@ The server will start on `http://localhost:3000`.
 ## Usage
 
 ### Storefront
-- Open `http://localhost:3000/catepillar_clay.html` in your browser
+- Open `http://localhost:3000` in your browser
 - Browse products, add to cart, checkout (requires Clerk auth)
 
 ### Admin Panel
 - Open `http://localhost:3000/admin/`
 - Requires admin user (set `is_admin = true` in database)
+- Or set `TESTING_MODE=true` in `.env` to bypass auth
 - Manage products, view orders, add tracking
 
 ### Making a User Admin
@@ -235,22 +247,6 @@ curl -X POST http://localhost:3000/admin/api/products \
 | POST | `/api/webhooks/polar` | Payment confirmations |
 | POST | `/api/webhooks/easypost` | Shipping updates |
 
-## Development without External Services
-
-For local development without Clerk/Polar/EasyPost:
-
-1. The app will still run but auth features won't work
-2. You can add products directly to the database:
-
-```bash
-sqlite3 caterpillar_clay.db "INSERT INTO products (id, name, description, price_cents, stock_quantity, is_active) VALUES
-('prod-1', 'Caterpillar Mug', 'A cute ceramic mug', 2400, 10, 1),
-('prod-2', 'Cocoon Vase', 'Elegant handmade vase', 3600, 5, 1),
-('prod-3', 'Leaf Bowl', 'Nature-inspired bowl', 2800, 8, 1);"
-```
-
-3. Products will display on the storefront at `/api/products`
-
 ## Deployment
 
 ### Build for Production
@@ -264,6 +260,7 @@ cargo build --release
 - Set `BASE_URL` to your production domain
 - Configure proper SMTP credentials
 - Set up webhook endpoints in Polar.sh and EasyPost dashboards
+- Set `TESTING_MODE=false`
 
 ### Running with systemd
 
@@ -272,7 +269,7 @@ Create `/etc/systemd/system/caterpillar-clay.service`:
 ```ini
 [Unit]
 Description=Caterpillar Clay Backend
-After=network.target postgresql.service
+After=network.target
 
 [Service]
 Type=simple

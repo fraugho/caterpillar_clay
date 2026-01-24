@@ -6,10 +6,11 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::dangerous;
+use libsql::Database;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::SqlitePool;
+use std::sync::Arc;
 
 use crate::models::User;
 
@@ -43,7 +44,7 @@ impl From<User> for AuthUser {
 }
 
 pub async fn auth_middleware(
-    State(pool): State<SqlitePool>,
+    State(db): State<Arc<Database>>,
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
@@ -65,15 +66,7 @@ pub async fn auth_middleware(
     };
 
     // Decode the JWT without verification for now (in production, use JWKS)
-    let mut validation = Validation::new(Algorithm::RS256);
-    validation.insecure_disable_signature_validation();
-    validation.validate_exp = true;
-
-    let claims = match decode::<ClerkClaims>(
-        token,
-        &DecodingKey::from_secret(&[]),
-        &validation,
-    ) {
+    let claims = match dangerous::insecure_decode::<ClerkClaims>(token) {
         Ok(data) => data.claims,
         Err(e) => {
             tracing::warn!("JWT decode error: {}", e);
@@ -85,7 +78,19 @@ pub async fn auth_middleware(
         }
     };
 
-    let user = match User::find_by_clerk_id(&pool, &claims.sub).await {
+    let conn = match db.connect() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("Database connection error: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Internal server error"})),
+            )
+                .into_response();
+        }
+    };
+
+    let user = match User::find_by_clerk_id(&conn, &claims.sub).await {
         Ok(Some(user)) => user,
         Ok(None) => {
             return (
@@ -109,7 +114,7 @@ pub async fn auth_middleware(
 }
 
 pub async fn require_admin(
-    State(_pool): State<SqlitePool>,
+    State(_db): State<Arc<Database>>,
     req: Request<Body>,
     next: Next,
 ) -> Response {

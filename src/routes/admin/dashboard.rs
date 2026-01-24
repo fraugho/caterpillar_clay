@@ -1,7 +1,7 @@
 use axum::{extract::State, routing::get, Json, Router};
 use serde::Serialize;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::{Order, Product};
 use crate::routes::AppState;
 
@@ -35,10 +35,12 @@ pub fn routes() -> Router<AppState> {
 }
 
 async fn get_dashboard(State(state): State<AppState>) -> AppResult<Json<DashboardStats>> {
-    let total_orders = Order::count_all(&state.pool).await?;
-    let total_revenue_cents = Order::total_revenue(&state.pool).await?;
+    let conn = state.db.connect().map_err(AppError::from)?;
 
-    let products = Product::list_all(&state.pool).await?;
+    let total_orders = Order::count_all(&conn).await?;
+    let total_revenue_cents = Order::total_revenue(&conn).await?;
+
+    let products = Product::list_all(&conn).await?;
     let total_products = products.len() as i64;
 
     let low_stock_products: Vec<LowStockProduct> = products
@@ -51,7 +53,7 @@ async fn get_dashboard(State(state): State<AppState>) -> AppResult<Json<Dashboar
         })
         .collect();
 
-    let orders = Order::list_all(&state.pool).await?;
+    let orders = Order::list_all(&conn).await?;
     let recent_orders: Vec<RecentOrder> = orders
         .into_iter()
         .take(10)

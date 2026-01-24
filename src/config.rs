@@ -17,6 +17,7 @@ pub struct Config {
     pub upload_dir: String,
     pub base_url: String,
     pub port: u16,
+    pub testing_mode: bool,
 }
 
 impl Config {
@@ -41,6 +42,9 @@ impl Config {
                 .unwrap_or_else(|_| "3000".to_string())
                 .parse()
                 .unwrap_or(3000),
+            testing_mode: env::var("TESTING_MODE")
+                .unwrap_or_else(|_| "false".to_string())
+                .to_lowercase() == "true",
         })
     }
 }
