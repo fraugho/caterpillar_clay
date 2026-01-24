@@ -21,8 +21,8 @@ pub struct AdminOrderResponse {
     pub tracking_number: Option<String>,
     pub easypost_tracker_id: Option<String>,
     pub items: Vec<AdminOrderItemResponse>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_ts: i64,
+    pub updated_ts: i64,
 }
 
 #[derive(Serialize)]
@@ -89,8 +89,8 @@ async fn list_orders(State(state): State<AppState>) -> AppResult<Json<Vec<AdminO
             tracking_number: order.tracking_number.clone(),
             easypost_tracker_id: order.easypost_tracker_id.clone(),
             items,
-            created_at: order.created_at,
-            updated_at: order.updated_at,
+            created_ts: order.created_ts,
+            updated_ts: order.updated_ts,
         });
     }
 
@@ -130,8 +130,8 @@ async fn get_order(
         tracking_number: order.tracking_number.clone(),
         easypost_tracker_id: order.easypost_tracker_id.clone(),
         items,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+        created_ts: order.created_ts,
+        updated_ts: order.updated_ts,
     }))
 }
 
@@ -171,8 +171,8 @@ async fn update_status(
         tracking_number: order.tracking_number.clone(),
         easypost_tracker_id: order.easypost_tracker_id.clone(),
         items,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+        created_ts: order.created_ts,
+        updated_ts: order.updated_ts,
     }))
 }
 
@@ -234,8 +234,8 @@ async fn add_tracking(
         tracking_number: order.tracking_number.clone(),
         easypost_tracker_id: order.easypost_tracker_id.clone(),
         items,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
+        created_ts: order.created_ts,
+        updated_ts: order.updated_ts,
     }))
 }
 

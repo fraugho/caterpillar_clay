@@ -11,8 +11,8 @@ pub struct User {
     pub email: String,
     pub name: Option<String>,
     pub is_admin: bool,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_ts: i64,
+    pub updated_ts: i64,
 }
 
 impl User {
@@ -27,8 +27,8 @@ impl User {
             email: row.get(2)?,
             name: row.get(3)?,
             is_admin: row.get::<i32>(4)? != 0,
-            created_at: row.get(5)?,
-            updated_at: row.get(6)?,
+            created_ts: row.get(7)?,
+            updated_ts: row.get(8)?,
         })
     }
 }
@@ -67,9 +67,14 @@ impl User {
 
     pub async fn create(conn: &Connection, data: CreateUser) -> AppResult<Self> {
         let id = Uuid::new_v4().to_string();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
         conn.execute(
-            "INSERT INTO users (id, clerk_id, email, name) VALUES (?, ?, ?, ?)",
-            libsql::params![id.clone(), data.clerk_id.clone(), data.email.clone(), data.name.clone()],
+            "INSERT INTO users (id, clerk_id, email, name, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.clerk_id.clone(), data.email.clone(), data.name.clone(), now, now],
         )
         .await
         .map_err(AppError::from)?;
@@ -80,10 +85,15 @@ impl User {
     }
 
     pub async fn upsert(conn: &Connection, data: CreateUser) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
         if let Some(existing) = Self::find_by_clerk_id(conn, &data.clerk_id).await? {
             conn.execute(
-                "UPDATE users SET email = ?, name = ?, updated_at = datetime('now') WHERE clerk_id = ?",
-                libsql::params![data.email.clone(), data.name.clone(), data.clerk_id.clone()],
+                "UPDATE users SET email = ?, name = ?, updated_ts = ? WHERE clerk_id = ?",
+                libsql::params![data.email.clone(), data.name.clone(), now, data.clerk_id.clone()],
             )
             .await
             .map_err(AppError::from)?;
@@ -97,9 +107,14 @@ impl User {
     }
 
     pub async fn set_admin(conn: &Connection, id: &str, is_admin: bool) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
         conn.execute(
-            "UPDATE users SET is_admin = ?, updated_at = datetime('now') WHERE id = ?",
-            libsql::params![is_admin as i32, id.to_string()],
+            "UPDATE users SET is_admin = ?, updated_ts = ? WHERE id = ?",
+            libsql::params![is_admin as i32, now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

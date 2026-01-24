@@ -60,8 +60,8 @@ pub struct Order {
     pub tracking_number: Option<String>,
     pub easypost_tracker_id: Option<String>,
     pub polar_checkout_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_ts: i64,
+    pub updated_ts: i64,
 }
 
 impl Order {
@@ -75,8 +75,8 @@ impl Order {
             tracking_number: row.get(5)?,
             easypost_tracker_id: row.get(6)?,
             polar_checkout_id: row.get(7)?,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
+            created_ts: row.get(10)?,
+            updated_ts: row.get(11)?,
         })
     }
 }
@@ -158,7 +158,7 @@ impl Order {
     pub async fn list_by_user(conn: &Connection, user_id: &str) -> AppResult<Vec<Self>> {
         let mut rows = conn
             .query(
-                "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+                "SELECT * FROM orders WHERE user_id = ? ORDER BY created_ts DESC",
                 [user_id],
             )
             .await
@@ -173,7 +173,7 @@ impl Order {
 
     pub async fn list_all(conn: &Connection) -> AppResult<Vec<Self>> {
         let mut rows = conn
-            .query("SELECT * FROM orders ORDER BY created_at DESC", ())
+            .query("SELECT * FROM orders ORDER BY created_ts DESC", ())
             .await
             .map_err(AppError::from)?;
 
@@ -186,12 +186,16 @@ impl Order {
 
     pub async fn create(conn: &Connection, data: CreateOrder) -> AppResult<Self> {
         let id = Uuid::new_v4().to_string();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
         let shipping_json = serde_json::to_string(&data.shipping_address)
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
         conn.execute(
-            "INSERT INTO orders (id, user_id, total_cents, shipping_address, polar_checkout_id) VALUES (?, ?, ?, ?, ?)",
-            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.polar_checkout_id.clone()],
+            "INSERT INTO orders (id, user_id, total_cents, shipping_address, polar_checkout_id, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.polar_checkout_id.clone(), now, now],
         )
         .await
         .map_err(AppError::from)?;
@@ -212,9 +216,14 @@ impl Order {
     }
 
     pub async fn update_status(conn: &Connection, id: &str, status: OrderStatus) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
         conn.execute(
-            "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?",
-            libsql::params![status.as_str().to_string(), id.to_string()],
+            "UPDATE orders SET status = ?, updated_ts = ? WHERE id = ?",
+            libsql::params![status.as_str().to_string(), now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;
@@ -230,16 +239,21 @@ impl Order {
         tracking_number: &str,
         easypost_tracker_id: Option<&str>,
     ) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
         conn.execute(
             r#"
             UPDATE orders SET
                 tracking_number = ?,
                 easypost_tracker_id = ?,
                 status = 'shipped',
-                updated_at = datetime('now')
+                updated_ts = ?
             WHERE id = ?
             "#,
-            libsql::params![tracking_number.to_string(), easypost_tracker_id.map(|s| s.to_string()), id.to_string()],
+            libsql::params![tracking_number.to_string(), easypost_tracker_id.map(|s| s.to_string()), now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

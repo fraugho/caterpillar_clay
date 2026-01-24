@@ -22,8 +22,8 @@ pub struct AdminProductResponse {
     pub is_active: bool,
     pub polar_product_id: Option<String>,
     pub polar_price_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    pub created_ts: i64,
+    pub updated_ts: i64,
 }
 
 impl AdminProductResponse {
@@ -48,8 +48,8 @@ impl AdminProductResponse {
             is_active: product.is_active,
             polar_product_id: product.polar_product_id,
             polar_price_id: product.polar_price_id,
-            created_at: product.created_at,
-            updated_at: product.updated_at,
+            created_ts: product.created_ts,
+            updated_ts: product.updated_ts,
         }
     }
 }

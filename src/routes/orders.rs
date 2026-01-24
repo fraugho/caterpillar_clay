@@ -19,7 +19,7 @@ pub struct OrderResponse {
     pub shipping_address: Option<ShippingAddress>,
     pub tracking_number: Option<String>,
     pub items: Vec<OrderItemResponse>,
-    pub created_at: String,
+    pub created_ts: i64,
 }
 
 #[derive(Serialize)]
@@ -57,7 +57,7 @@ async fn list_orders(
             shipping_address: order.get_shipping_address(),
             tracking_number: order.tracking_number.clone(),
             items: item_responses,
-            created_at: order.created_at,
+            created_ts: order.created_ts,
         });
     }
 
@@ -90,7 +90,7 @@ async fn get_order(
         shipping_address: order.get_shipping_address(),
         tracking_number: order.tracking_number.clone(),
         items: item_responses,
-        created_at: order.created_at,
+        created_ts: order.created_ts,
     }))
 }
 

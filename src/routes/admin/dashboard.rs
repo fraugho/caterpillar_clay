@@ -27,7 +27,7 @@ pub struct RecentOrder {
     pub id: String,
     pub status: String,
     pub total: f64,
-    pub created_at: String,
+    pub created_ts: i64,
 }
 
 pub fn routes() -> Router<AppState> {
@@ -61,7 +61,7 @@ async fn get_dashboard(State(state): State<AppState>) -> AppResult<Json<Dashboar
             id: o.id.to_string()[..8].to_string(),
             status: o.status,
             total: o.total_cents as f64 / 100.0,
-            created_at: o.created_at,
+            created_ts: o.created_ts,
         })
         .collect();
 
