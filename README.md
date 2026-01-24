@@ -70,7 +70,10 @@ clay/
 │   ├── 002_create_products.sql
 │   ├── 003_create_orders.sql
 │   ├── 004_create_order_items.sql
-│   └── 005_seed_products.sql
+│   ├── 005_seed_products.sql
+│   ├── 006_add_polar_price_id.sql
+│   ├── 007_add_polar_product_id.sql
+│   └── 008_unix_timestamps.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -173,6 +176,8 @@ TESTING_MODE=false
 for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 ```
 
+**Note:** Timestamps are stored as Unix epoch integers (`i64`) for efficiency. The `created_ts` and `updated_ts` fields use seconds since 1970-01-01.
+
 ### 3. Build and Run
 
 ```bash
@@ -200,6 +205,7 @@ The server will start on `http://localhost:3000`.
 - Requires admin user (set `is_admin = true` in database)
 - Or set `TESTING_MODE=true` in `.env` to bypass auth
 - Manage products, view orders, add tracking
+- **Auto-sync**: Product changes automatically sync to Polar.sh (create, update, archive)
 
 ### Making a User Admin
 
@@ -259,6 +265,53 @@ curl -X POST http://localhost:3000/admin/api/products \
 |--------|----------|-------------|
 | POST | `/api/webhooks/polar` | Payment confirmations |
 | POST | `/api/webhooks/easypost` | Shipping updates |
+
+## Polar.sh Integration
+
+The admin dashboard automatically syncs products to Polar.sh when you create, update, or delete products. Each product stores both `polar_product_id` and `polar_price_id` for tracking.
+
+### Token Scopes Required
+
+When creating a Polar.sh access token, enable these scopes:
+- `products:read`
+- `products:write`
+- `files:read`
+- `files:write`
+- `organizations:read`
+- `checkouts:read`
+- `checkouts:write`
+
+### API Tips
+
+**Trailing slashes are required** - Polar's API returns 307 redirects without them:
+```rust
+// Wrong - returns 307
+format!("{}/v1/products", base_url)
+
+// Correct
+format!("{}/v1/products/", base_url)
+```
+
+**Organization tokens don't need organization_id** - If using an organization-scoped token, do NOT include `organization_id` in request bodies:
+```rust
+// Wrong for org tokens - returns "organization_token" error
+json!({ "name": "Product", "organization_id": "..." })
+
+// Correct for org tokens
+json!({ "name": "Product" })
+```
+
+**Image uploads require SHA256 checksums** - When uploading product images:
+1. Request an upload URL with the file's SHA256 checksum
+2. Include `x-amz-checksum-sha256` header in the S3 PUT request
+3. Complete the upload by calling the file complete endpoint
+
+### Webhook Events
+
+Configure your webhook endpoint at `https://yourdomain.com/api/webhooks/polar` to receive:
+- `checkout.created` - Customer started checkout
+- `checkout.updated` - Checkout status changed
+- `order.created` - Order was placed
 
 ## Deployment
 
