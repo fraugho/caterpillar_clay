@@ -205,7 +205,7 @@ The server will start on `http://localhost:3000`.
 - Requires admin user (set `is_admin = true` in database)
 - Or set `TESTING_MODE=true` in `.env` to bypass auth
 - Manage products, view orders, add tracking
-- **Auto-sync**: Product changes automatically sync to Polar.sh (create, update, archive)
+- **Auto-sync**: Product changes automatically sync to Polar.sh (create, update, archive, images)
 
 ### Making a User Admin
 
@@ -268,7 +268,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 
 ## Polar.sh Integration
 
-The admin dashboard automatically syncs products to Polar.sh when you create, update, or delete products. Each product stores both `polar_product_id` and `polar_price_id` for tracking.
+The admin dashboard automatically syncs products to Polar.sh when you create, update, delete, or upload images for products. Each product stores both `polar_product_id` and `polar_price_id` for tracking. The admin panel is the single source of truth - all changes propagate to Polar, R2 storage, and Turso automatically.
 
 ### Token Scopes Required
 
