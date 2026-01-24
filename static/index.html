@@ -355,9 +355,7 @@
                 },
 
                 async signIn(){
-                    if(window.Clerk){
-                        window.Clerk.openSignIn();
-                    }
+                    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
                 },
 
                 async signOut(){

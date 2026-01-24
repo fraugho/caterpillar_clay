@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Caterpillar Clay</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Clerk -->
+    <script async crossorigin="anonymous" data-clerk-publishable-key="pk_test_Y2FyaW5nLWpheWJpcmQtODYuY2xlcmsuYWNjb3VudHMuZGV2JA" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+    <style>
+        :root{
+            --bg-primary:#F8F8F8;
+            --bg-secondary:#FFFFFF;
+            --bg-card:#FFFFFF;
+            --text-primary:#18191B;
+            --text-secondary:#666666;
+            --accent:#97BAD9;
+            --accent-hover:#7BA3C9;
+            --border:#E0E0E0;
+        }
+        @media(prefers-color-scheme:dark){
+            :root{
+                --bg-primary:#18191B;
+                --bg-secondary:#1E2022;
+                --bg-card:#252729;
+                --text-primary:#F8F8F8;
+                --text-secondary:#A0A0A0;
+                --accent:#97BAD9;
+                --accent-hover:#AECCE8;
+                --border:#333537;
+            }
+        }
+        *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
+        body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;display:flex;flex-direction:column}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+        .star{position:absolute;background:var(--accent);opacity:0.4}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
+        nav{background:var(--accent);padding:40px 20px 20px 20px;position:relative;z-index:10}
+        nav a{color:#fff;text-decoration:none;font-size:12px}
+        .container{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;position:relative;z-index:10}
+        .login-card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px;max-width:520px;width:100%;text-align:center}
+        #clerk-auth{display:flex;justify-content:center}
+        .back-link{display:inline-block;margin-top:24px;color:var(--accent);text-decoration:none;font-size:10px}
+        .back-link:hover{text-decoration:underline}
+
+        /* Override Clerk styles to match theme */
+        .cl-rootBox{
+            --clerk-font-family:'Press Start 2P',cursive;
+            width:100% !important;
+            display:flex !important;
+            justify-content:center !important;
+        }
+        .cl-signIn-root{
+            width:100% !important;
+            display:flex !important;
+            flex-direction:column !important;
+            align-items:center !important;
+        }
+        .cl-card{
+            background:var(--bg-card) !important;
+            border:none !important;
+            box-shadow:none !important;
+            padding:0 !important;
+            width:100% !important;
+            max-width:400px !important;
+            margin:0 auto !important;
+        }
+        .cl-cardBox{
+            margin:0 auto !important;
+            padding:0 !important;
+            width:100% !important;
+        }
+        .cl-main{
+            gap:8px !important;
+            padding-top:0 !important;
+        }
+        .cl-headerTitle{
+            font-family:'Press Start 2P',cursive !important;
+            color:var(--text-primary) !important;
+            font-size:14px !important;
+            margin-bottom:8px !important;
+        }
+        .cl-header{
+            margin-bottom:0px !important;
+            padding-top:0px !important;
+        }
+        .cl-headerSubtitle{
+            display:none !important;
+        }
+        .cl-formButtonPrimary{
+            background:var(--accent) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            border-radius:8px !important;
+            padding:18px 20px !important;
+            min-height:50px !important;
+            margin-top:4px !important;
+        }
+        .cl-formButtonPrimary:hover{
+            background:var(--accent-hover) !important;
+        }
+        /* Social buttons styling */
+        .cl-socialButtonsBlockButton{
+            background:var(--accent) !important;
+            border:none !important;
+            color:#18191B !important;
+            padding:16px 16px !important;
+            min-height:50px !important;
+        }
+        .cl-socialButtonsBlockButton:hover{
+            background:var(--accent-hover) !important;
+        }
+        .cl-dividerLine{
+            background:var(--accent) !important;
+        }
+        .cl-dividerRow{
+            margin:12px 0 !important;
+        }
+        .cl-socialButtons{
+            gap:8px !important;
+        }
+        .cl-formFieldInput{
+            background:var(--bg-secondary) !important;
+            border:2px solid var(--accent) !important;
+            color:var(--text-primary) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            padding:16px 12px !important;
+            min-height:50px !important;
+        }
+        .cl-formFieldInput:focus{
+            border-color:var(--accent-hover) !important;
+            box-shadow:0 0 0 2px rgba(151,186,217,0.3) !important;
+        }
+        .cl-formFieldLabel{
+            color:var(--text-primary) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            margin-bottom:8px !important;
+        }
+        .cl-formFieldRow{
+            margin-bottom:0px !important;
+        }
+        .cl-form{
+            gap:8px !important;
+        }
+        .cl-formFieldHintText{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:var(--text-secondary) !important;
+        }
+        .cl-socialButtonsBlockButtonText{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:#18191B !important;
+        }
+        .cl-footer{
+            margin-top:16px !important;
+            padding-bottom:0 !important;
+        }
+        .cl-footerAction{
+            display:flex !important;
+            flex-wrap:wrap !important;
+            justify-content:center !important;
+            gap:8px !important;
+        }
+        .cl-footerActionText{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:var(--text-secondary) !important;
+            margin-right:12px !important;
+        }
+        .cl-footerActionLink{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:var(--accent) !important;
+        }
+        .cl-dividerText{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:var(--accent) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <nav>
+        <div style="max-width:900px;margin:auto">
+            <a href="/">CATERPILLAR CLAY</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="login-card">
+            <div id="clerk-auth"></div>
+            <a href="/" class="back-link">< Back to Shop</a>
+        </div>
+    </div>
+
+    <script>
+        // Generate pixel stars
+        (function generateStars(){
+            const container=document.getElementById('stars');
+            const sizes=[2,3,4,6,8];
+            for(let i=0;i<60;i++){
+                const star=document.createElement('div');
+                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                const size=sizes[Math.floor(Math.random()*sizes.length)];
+                star.style.width=size+'px';
+                star.style.height=size+'px';
+                star.style.left=Math.random()*100+'%';
+                star.style.top=Math.random()*100+'%';
+                star.style.animationDelay=Math.random()*2+'s';
+                container.appendChild(star);
+            }
+        })();
+
+        // Initialize Clerk sign-in
+        window.addEventListener('load', async () => {
+            try {
+                await window.Clerk.load();
+
+                // If already signed in, redirect to home
+                if (window.Clerk.user) {
+                    // Check for redirect URL
+                    const params = new URLSearchParams(window.location.search);
+                    const redirect = params.get('redirect') || '/';
+                    window.location.href = redirect;
+                    return;
+                }
+
+                // Mount sign-in component
+                const signInDiv = document.getElementById('clerk-auth');
+                const styles = getComputedStyle(document.documentElement);
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+                window.Clerk.mountSignIn(signInDiv, {
+                    afterSignInUrl: new URLSearchParams(window.location.search).get('redirect') || '/',
+                    afterSignUpUrl: new URLSearchParams(window.location.search).get('redirect') || '/',
+                    appearance: {
+                        variables: {
+                            colorPrimary: '#97BAD9',
+                            colorText: styles.getPropertyValue('--text-primary').trim(),
+                            colorTextSecondary: '#97BAD9',
+                            colorBackground: styles.getPropertyValue('--bg-card').trim(),
+                            colorInputBackground: styles.getPropertyValue('--bg-secondary').trim(),
+                            colorInputText: styles.getPropertyValue('--text-primary').trim(),
+                            colorNeutral: '#97BAD9',
+                            borderRadius: '8px',
+                        },
+                        elements: {
+                            socialButtonsBlockButton: {
+                                backgroundColor: '#97BAD9',
+                                color: '#18191B',
+                                border: 'none',
+                                '&:hover': {
+                                    backgroundColor: isDark ? '#AECCE8' : '#7BA3C9'
+                                }
+                            },
+                            headerTitle: {
+                                color: isDark ? '#F8F8F8' : '#18191B'
+                            },
+                            dividerLine: {
+                                backgroundColor: '#97BAD9'
+                            },
+                            dividerText: {
+                                color: '#97BAD9'
+                            },
+                            formFieldInput: {
+                                borderColor: '#97BAD9'
+                            }
+                        }
+                    }
+                });
+            } catch(e) {
+                console.error('Failed to load Clerk:', e);
+                document.getElementById('clerk-auth').innerHTML = '<p style="color:var(--text-secondary);font-size:8px">Authentication service unavailable</p>';
+            }
+        });
+    </script>
+</body>
+</html>
