@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caterpillar Clay - Admin</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Press Start 2P', cursive; background: #1a1a2e; color: #eee; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        nav { background: #16213e; padding: 20px; border-bottom: 4px solid #8b5e3c; margin-bottom: 20px; }
+        nav .inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        nav h1 { font-size: 14px; color: #8b5e3c; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .tab { background: #16213e; color: #888; padding: 12px 16px; font-family: inherit; font-size: 8px; border: none; cursor: pointer; }
+        .tab.active { background: #8b5e3c; color: #fff; }
+        .tab:hover { background: #0f3460; color: #fff; }
+        .card { background: #16213e; padding: 20px; margin-bottom: 20px; border: 2px solid #0f3460; }
+        .card h2 { font-size: 12px; margin-bottom: 16px; color: #8b5e3c; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .stat { background: #0f3460; padding: 16px; text-align: center; }
+        .stat-value { font-size: 18px; color: #22c55e; margin-bottom: 8px; }
+        .stat-label { font-size: 8px; color: #888; }
+        table { width: 100%; border-collapse: collapse; font-size: 8px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #0f3460; }
+        th { color: #8b5e3c; }
+        .btn { background: #8b5e3c; color: #fff; padding: 8px 12px; font-family: inherit; font-size: 8px; border: none; cursor: pointer; }
+        .btn:hover { background: #6b4e2c; }
+        .btn-danger { background: #dc2626; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-success { background: #16a34a; }
+        .btn-sm { padding: 4px 8px; font-size: 6px; }
+        input, textarea, select { width: 100%; padding: 10px; font-family: inherit; font-size: 8px; margin-bottom: 12px; background: #0f3460; color: #eee; border: 1px solid #16213e; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #8b5e3c; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        label { display: block; font-size: 8px; margin-bottom: 4px; color: #888; }
+        .status { padding: 4px 8px; font-size: 6px; border-radius: 2px; }
+        .status-pending { background: #eab308; color: #000; }
+        .status-paid { background: #22c55e; color: #000; }
+        .status-processing { background: #3b82f6; color: #fff; }
+        .status-shipped { background: #8b5cf6; color: #fff; }
+        .status-delivered { background: #10b981; color: #fff; }
+        .status-cancelled { background: #ef4444; color: #fff; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #16213e; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h3 { font-size: 10px; color: #8b5e3c; }
+        .close-btn { background: none; border: none; color: #888; font-size: 16px; cursor: pointer; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+        .product-card { background: #0f3460; padding: 12px; }
+        .product-card img { width: 100%; height: 100px; object-fit: cover; background: #1a1a2e; margin-bottom: 8px; }
+        .product-card h4 { font-size: 8px; margin-bottom: 4px; }
+        .product-card .price { color: #22c55e; font-size: 10px; margin-bottom: 8px; }
+        .product-card .stock { font-size: 6px; color: #888; }
+        .product-actions { display: flex; gap: 4px; margin-top: 8px; }
+        .alert { padding: 12px; margin-bottom: 16px; font-size: 8px; }
+        .alert-warning { background: #fef3c7; color: #92400e; }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .toggle { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #0f3460; transition: .3s; }
+        .toggle-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #888; transition: .3s; }
+        .toggle input:checked + .toggle-slider { background: #22c55e; }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(20px); background: #fff; }
+    </style>
+</head>
+<body x-data="admin()">
+    <nav>
+        <div class="inner">
+            <h1>CATERPILLAR CLAY ADMIN</h1>
+            <button class="btn btn-sm" @click="logout()">LOGOUT</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">DASHBOARD</button>
+            <button class="tab" :class="{ active: tab === 'products' }" @click="tab = 'products'; loadProducts()">PRODUCTS</button>
+            <button class="tab" :class="{ active: tab === 'orders' }" @click="tab = 'orders'; loadOrders()">ORDERS</button>
+        </div>
+
+        <!-- Dashboard -->
+        <template x-if="tab === 'dashboard'">
+            <div>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" x-text="dashboard.total_orders || 0"></div>
+                        <div class="stat-label">TOTAL ORDERS</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">$<span x-text="(dashboard.total_revenue || 0).toFixed(2)"></span></div>
+                        <div class="stat-label">TOTAL REVENUE</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" x-text="dashboard.total_products || 0"></div>
+                        <div class="stat-label">PRODUCTS</div>
+                    </div>
+                </div>
+
+                <template x-if="dashboard.low_stock_products && dashboard.low_stock_products.length">
+                    <div class="card">
+                        <h2>LOW STOCK ALERTS</h2>
+                        <template x-for="p in dashboard.low_stock_products" :key="p.id">
+                            <div class="alert alert-warning">
+                                <span x-text="p.name"></span> - Only <span x-text="p.stock_quantity"></span> left
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <div class="card">
+                    <h2>RECENT ORDERS</h2>
+                    <table>
+                        <thead>
+                            <tr><th>ID</th><th>STATUS</th><th>TOTAL</th><th>DATE</th></tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="o in dashboard.recent_orders || []" :key="o.id">
+                                <tr>
+                                    <td x-text="o.id"></td>
+                                    <td><span class="status" :class="'status-' + o.status" x-text="o.status.toUpperCase()"></span></td>
+                                    <td>$<span x-text="o.total.toFixed(2)"></span></td>
+                                    <td x-text="new Date(o.created_at).toLocaleDateString()"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+
+        <!-- Products -->
+        <template x-if="tab === 'products'">
+            <div>
+                <div style="margin-bottom: 16px;">
+                    <button class="btn" @click="openProductModal()">+ ADD PRODUCT</button>
+                </div>
+
+                <div class="product-grid">
+                    <template x-for="p in products" :key="p.id">
+                        <div class="product-card">
+                            <img :src="p.image_url || '/static/placeholder.png'" :alt="p.name">
+                            <h4 x-text="p.name"></h4>
+                            <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
+                            <div class="stock">Stock: <span x-text="p.stock_quantity"></span></div>
+                            <div style="margin-top: 4px;">
+                                <label class="toggle">
+                                    <input type="checkbox" :checked="p.is_active" @change="toggleProductActive(p)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span style="font-size: 6px; margin-left: 4px;" x-text="p.is_active ? 'Active' : 'Inactive'"></span>
+                            </div>
+                            <div class="product-actions">
+                                <button class="btn btn-sm" @click="editProduct(p)">EDIT</button>
+                                <button class="btn btn-sm btn-danger" @click="deleteProduct(p.id)">DELETE</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- Orders -->
+        <template x-if="tab === 'orders'">
+            <div class="card">
+                <h2>ALL ORDERS</h2>
+                <table>
+                    <thead>
+                        <tr><th>ID</th><th>CUSTOMER</th><th>STATUS</th><th>TOTAL</th><th>DATE</th><th>ACTIONS</th></tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="o in orders" :key="o.id">
+                            <tr>
+                                <td x-text="o.id.substring(0, 8)"></td>
+                                <td x-text="o.user ? o.user.email : 'Guest'"></td>
+                                <td>
+                                    <select class="btn btn-sm" :value="o.status" @change="updateOrderStatus(o.id, $event.target.value)" style="width: auto;">
+                                        <option value="pending">Pending</option>
+                                        <option value="paid">Paid</option>
+                                        <option value="processing">Processing</option>
+                                        <option value="shipped">Shipped</option>
+                                        <option value="delivered">Delivered</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </td>
+                                <td>$<span x-text="o.total.toFixed(2)"></span></td>
+                                <td x-text="new Date(o.created_at).toLocaleDateString()"></td>
+                                <td>
+                                    <button class="btn btn-sm" @click="viewOrder(o)">VIEW</button>
+                                    <template x-if="!o.tracking_number && o.status !== 'pending'">
+                                        <button class="btn btn-sm btn-success" @click="openTrackingModal(o)">ADD TRACKING</button>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal" :class="{ active: showProductModal }">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 x-text="editingProduct ? 'EDIT PRODUCT' : 'ADD PRODUCT'"></h3>
+                <button class="close-btn" @click="showProductModal = false">&times;</button>
+            </div>
+            <form @submit.prevent="saveProduct()">
+                <label>Name</label>
+                <input type="text" x-model="productForm.name" required>
+
+                <label>Description</label>
+                <textarea x-model="productForm.description" rows="3"></textarea>
+
+                <div class="form-row">
+                    <div>
+                        <label>Price (cents)</label>
+                        <input type="number" x-model="productForm.price_cents" required>
+                    </div>
+                    <div>
+                        <label>Stock</label>
+                        <input type="number" x-model="productForm.stock_quantity">
+                    </div>
+                </div>
+
+                <template x-if="editingProduct">
+                    <div>
+                        <label>Product Image</label>
+                        <input type="file" @change="uploadImage($event)" accept="image/*">
+                        <template x-if="editingProduct.image_url">
+                            <img :src="editingProduct.image_url" style="max-width: 100px; margin-top: 8px;">
+                        </template>
+                    </div>
+                </template>
+
+                <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">SAVE</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div class="modal" :class="{ active: showOrderModal }">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ORDER DETAILS</h3>
+                <button class="close-btn" @click="showOrderModal = false">&times;</button>
+            </div>
+            <template x-if="selectedOrder">
+                <div>
+                    <p style="font-size: 8px; margin-bottom: 8px;"><strong>ID:</strong> <span x-text="selectedOrder.id"></span></p>
+                    <p style="font-size: 8px; margin-bottom: 8px;"><strong>Status:</strong> <span x-text="selectedOrder.status"></span></p>
+                    <p style="font-size: 8px; margin-bottom: 8px;"><strong>Total:</strong> $<span x-text="selectedOrder.total.toFixed(2)"></span></p>
+
+                    <template x-if="selectedOrder.shipping_address">
+                        <div style="margin-bottom: 12px;">
+                            <p style="font-size: 8px; color: #8b5e3c; margin-bottom: 4px;">SHIPPING ADDRESS</p>
+                            <p style="font-size: 8px;" x-text="selectedOrder.shipping_address.name"></p>
+                            <p style="font-size: 8px;" x-text="selectedOrder.shipping_address.street"></p>
+                            <p style="font-size: 8px;" x-text="`${selectedOrder.shipping_address.city}, ${selectedOrder.shipping_address.state} ${selectedOrder.shipping_address.zip}`"></p>
+                        </div>
+                    </template>
+
+                    <template x-if="selectedOrder.tracking_number">
+                        <p style="font-size: 8px; margin-bottom: 8px;"><strong>Tracking:</strong> <span x-text="selectedOrder.tracking_number"></span></p>
+                    </template>
+
+                    <p style="font-size: 8px; color: #8b5e3c; margin: 12px 0 4px;">ITEMS</p>
+                    <template x-for="item in selectedOrder.items" :key="item.product_id">
+                        <p style="font-size: 8px; margin-bottom: 4px;">
+                            <span x-text="item.product_name"></span> x<span x-text="item.quantity"></span> - $<span x-text="(item.price_cents / 100).toFixed(2)"></span>
+                        </p>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Tracking Modal -->
+    <div class="modal" :class="{ active: showTrackingModal }">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ADD TRACKING</h3>
+                <button class="close-btn" @click="showTrackingModal = false">&times;</button>
+            </div>
+            <form @submit.prevent="saveTracking()">
+                <label>Tracking Number</label>
+                <input type="text" x-model="trackingForm.tracking_number" required>
+
+                <label>Carrier (optional)</label>
+                <input type="text" x-model="trackingForm.carrier" placeholder="USPS, FedEx, UPS...">
+
+                <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">SAVE TRACKING</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function admin() {
+            return {
+                tab: 'dashboard',
+                dashboard: {},
+                products: [],
+                orders: [],
+                showProductModal: false,
+                showOrderModal: false,
+                showTrackingModal: false,
+                editingProduct: null,
+                selectedOrder: null,
+                trackingOrderId: null,
+                productForm: { name: '', description: '', price_cents: 0, stock_quantity: 0 },
+                trackingForm: { tracking_number: '', carrier: '' },
+
+                async init() {
+                    await this.loadDashboard();
+                },
+
+                async loadDashboard() {
+                    try {
+                        const res = await fetch('/admin/api/dashboard');
+                        this.dashboard = await res.json();
+                    } catch (e) {
+                        console.error('Failed to load dashboard:', e);
+                    }
+                },
+
+                async loadProducts() {
+                    try {
+                        const res = await fetch('/admin/api/products');
+                        this.products = await res.json();
+                    } catch (e) {
+                        console.error('Failed to load products:', e);
+                    }
+                },
+
+                async loadOrders() {
+                    try {
+                        const res = await fetch('/admin/api/orders');
+                        this.orders = await res.json();
+                    } catch (e) {
+                        console.error('Failed to load orders:', e);
+                    }
+                },
+
+                openProductModal() {
+                    this.editingProduct = null;
+                    this.productForm = { name: '', description: '', price_cents: 0, stock_quantity: 0 };
+                    this.showProductModal = true;
+                },
+
+                editProduct(product) {
+                    this.editingProduct = product;
+                    this.productForm = {
+                        name: product.name,
+                        description: product.description || '',
+                        price_cents: product.price_cents,
+                        stock_quantity: product.stock_quantity
+                    };
+                    this.showProductModal = true;
+                },
+
+                async saveProduct() {
+                    try {
+                        const url = this.editingProduct
+                            ? `/admin/api/products/${this.editingProduct.id}`
+                            : '/admin/api/products';
+                        const method = this.editingProduct ? 'PUT' : 'POST';
+
+                        await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.productForm)
+                        });
+
+                        this.showProductModal = false;
+                        await this.loadProducts();
+                    } catch (e) {
+                        console.error('Failed to save product:', e);
+                    }
+                },
+
+                async toggleProductActive(product) {
+                    try {
+                        await fetch(`/admin/api/products/${product.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_active: !product.is_active })
+                        });
+                        await this.loadProducts();
+                    } catch (e) {
+                        console.error('Failed to toggle product:', e);
+                    }
+                },
+
+                async deleteProduct(id) {
+                    if (!confirm('Delete this product?')) return;
+                    try {
+                        await fetch(`/admin/api/products/${id}`, { method: 'DELETE' });
+                        await this.loadProducts();
+                    } catch (e) {
+                        console.error('Failed to delete product:', e);
+                    }
+                },
+
+                async uploadImage(event) {
+                    const file = event.target.files[0];
+                    if (!file || !this.editingProduct) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        const res = await fetch(`/admin/api/products/${this.editingProduct.id}/image`, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const updated = await res.json();
+                        this.editingProduct.image_url = updated.image_url;
+                        await this.loadProducts();
+                    } catch (e) {
+                        console.error('Failed to upload image:', e);
+                    }
+                },
+
+                viewOrder(order) {
+                    this.selectedOrder = order;
+                    this.showOrderModal = true;
+                },
+
+                async updateOrderStatus(orderId, status) {
+                    try {
+                        await fetch(`/admin/api/orders/${orderId}/status`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status })
+                        });
+                        await this.loadOrders();
+                    } catch (e) {
+                        console.error('Failed to update order status:', e);
+                    }
+                },
+
+                openTrackingModal(order) {
+                    this.trackingOrderId = order.id;
+                    this.trackingForm = { tracking_number: '', carrier: '' };
+                    this.showTrackingModal = true;
+                },
+
+                async saveTracking() {
+                    try {
+                        await fetch(`/admin/api/orders/${this.trackingOrderId}/tracking`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.trackingForm)
+                        });
+                        this.showTrackingModal = false;
+                        await this.loadOrders();
+                    } catch (e) {
+                        console.error('Failed to save tracking:', e);
+                    }
+                },
+
+                logout() {
+                    // Handle Clerk logout
+                    window.location.href = '/';
+                }
+            };
+        }
+    </script>
+</body>
+</html>

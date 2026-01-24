@@ -1,0 +1,53 @@
+pub mod admin;
+pub mod auth;
+pub mod cart;
+pub mod orders;
+pub mod products;
+pub mod webhooks;
+
+use axum::{middleware, Router};
+use sqlx::SqlitePool;
+use std::sync::Arc;
+use tower_http::cors::CorsLayer;
+use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
+
+use crate::config::Config;
+use crate::middleware::auth::auth_middleware;
+use crate::services::{ClerkService, EasyPostService, EmailService, PolarService};
+use crate::storage::LocalStorage;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: SqlitePool,
+    pub config: Config,
+    pub clerk: ClerkService,
+    pub polar: PolarService,
+    pub easypost: EasyPostService,
+    pub email: Option<EmailService>,
+    pub storage: Arc<LocalStorage>,
+}
+
+pub fn create_router(state: AppState) -> Router {
+    let public_routes = Router::new()
+        .merge(products::public_routes())
+        .merge(auth::routes())
+        .merge(webhooks::routes());
+
+    let protected_routes = Router::new()
+        .merge(orders::routes())
+        .merge(cart::routes())
+        .layer(middleware::from_fn_with_state(state.pool.clone(), auth_middleware));
+
+    let admin_routes = admin::routes(state.pool.clone());
+
+    Router::new()
+        .nest("/api", public_routes)
+        .nest("/api", protected_routes)
+        .nest("/admin", admin_routes)
+        .nest_service("/uploads", ServeDir::new(&state.config.upload_dir))
+        .fallback_service(ServeDir::new("static"))
+        .layer(TraceLayer::new_for_http())
+        .layer(CorsLayer::permissive())
+        .with_state(state)
+}
