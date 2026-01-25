@@ -51,7 +51,7 @@
         #caterpillar{position:fixed;pointer-events:none;z-index:9999;will-change:transform;left:0;top:0}
         .loading{opacity:0.6;pointer-events:none}
         .product-img{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);border:2px solid var(--border);border-radius:8px;margin-bottom:12px;transition:transform .2s}
-        .product-card{cursor:none;transition:transform .2s,box-shadow .2s}
+        .product-card{cursor:none;transition:transform .2s,box-shadow .2s;will-change:transform;backface-visibility:hidden}
         .product-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
         .product-card:hover .product-img{transform:scale(1.02)}
         .order-card{background:var(--bg-card);padding:16px;margin-bottom:12px;border:2px solid var(--border);border-radius:12px}
@@ -67,8 +67,10 @@
         .user-dropdown a{display:block;color:#fff;text-decoration:none;padding:8px;font-size:8px;border-radius:4px}
         .user-dropdown a:hover{background:var(--accent-hover)}
         .detail-overlay{position:fixed;inset:0;background:var(--bg-primary);z-index:1000;overflow-y:auto;padding:20px}
+        .detail-overlay .stars{position:absolute;inset:0;z-index:0;pointer-events:none}
+        .detail-overlay .detail-content{position:relative;z-index:1}
         .gallery-img{width:100%;max-width:600px;border-radius:12px;margin-bottom:20px;border:2px solid var(--border)}
-        .back-btn{position:fixed;top:20px;left:20px;z-index:1001;background:var(--accent);color:#18191B;padding:12px 16px;font-family:inherit;font-size:8px;border:none;cursor:none;border-radius:8px}
+        .back-btn{position:fixed;top:20px;left:20px;z-index:1002;background:var(--accent);color:#18191B;padding:12px 16px;font-family:inherit;font-size:8px;border:none;cursor:none;border-radius:8px}
         .back-btn:hover{background:var(--accent-hover)}
         .carousel{position:relative;width:100%;height:380px;overflow:hidden;border-radius:8px;border:2px solid var(--border);margin-bottom:12px}
         .carousel-inner{display:flex;transition:transform 0.3s ease;height:100%}
@@ -79,7 +81,7 @@
         .carousel-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10}
         .carousel-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.5);border:none;cursor:none}
         .carousel-dot.active{background:#fff}
-        .detail-carousel{max-width:600px;height:500px;margin:0 auto 20px}
+        .detail-carousel{width:100%;height:650px;margin:0 auto 32px}
     </style>
 </head>
 <body x-data="shop()">
@@ -89,41 +91,46 @@
 
     <!-- Product Detail Overlay -->
     <template x-if="selectedProduct">
-        <div class="detail-overlay" x-data="{ detailIdx: 0 }">
+        <div class="detail-overlay" x-data="{ detailIdx: 0 }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))">
+            <div class="stars"></div>
             <button class="back-btn" @click="closeProduct()">← BACK</button>
-            <div style="max-width:600px;margin:60px auto;text-align:center">
-                <template x-if="selectedProduct.images && selectedProduct.images.length > 0">
-                    <div class="carousel detail-carousel">
-                        <div class="carousel-inner" :style="`transform: translateX(-${detailIdx * 100}%)`">
-                            <template x-for="img in selectedProduct.images" :key="img">
-                                <img :src="img" :alt="selectedProduct.name">
-                            </template>
-                        </div>
-                        <template x-if="selectedProduct.images.length > 1">
-                            <button class="carousel-btn prev" @click="detailIdx = (detailIdx - 1 + selectedProduct.images.length) % selectedProduct.images.length">&lt;</button>
-                        </template>
-                        <template x-if="selectedProduct.images.length > 1">
-                            <button class="carousel-btn next" @click="detailIdx = (detailIdx + 1) % selectedProduct.images.length">&gt;</button>
-                        </template>
-                        <template x-if="selectedProduct.images.length > 1">
-                            <div class="carousel-dots">
-                                <template x-for="(img, idx) in selectedProduct.images" :key="img">
-                                    <button class="carousel-dot" :class="{ active: idx === detailIdx }" @click="detailIdx = idx"></button>
+            <div class="detail-content">
+                <div style="max-width:900px;margin:80px auto;padding:0 20px">
+                    <div class="card" style="padding:40px;text-align:center">
+                    <template x-if="selectedProduct.images && selectedProduct.images.length > 0">
+                        <div class="carousel detail-carousel">
+                            <div class="carousel-inner" :style="`transform: translateX(-${detailIdx * 100}%)`">
+                                <template x-for="img in selectedProduct.images" :key="img">
+                                    <img :src="img" :alt="selectedProduct.name">
                                 </template>
                             </div>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="!selectedProduct.images || selectedProduct.images.length === 0">
-                    <div class="gallery-img" style="height:400px;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary)">[IMAGE]</div>
-                </template>
-                <h1 style="font-size:16px;margin-bottom:16px" x-text="selectedProduct.name"></h1>
-                <p style="font-size:14px;color:var(--accent);margin-bottom:16px">$<span x-text="selectedProduct.price.toFixed(2)"></span></p>
-                <p style="font-size:10px;color:var(--text-secondary);margin-bottom:24px" x-text="selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
-                <template x-if="selectedProduct.description">
-                    <p style="font-size:8px;color:var(--text-secondary);margin-bottom:24px;line-height:1.8" x-text="selectedProduct.description"></p>
-                </template>
-                <button class="btn" style="max-width:400px;margin:0 auto" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                            <template x-if="selectedProduct.images.length > 1">
+                                <button class="carousel-btn prev" @click="detailIdx = (detailIdx - 1 + selectedProduct.images.length) % selectedProduct.images.length">&lt;</button>
+                            </template>
+                            <template x-if="selectedProduct.images.length > 1">
+                                <button class="carousel-btn next" @click="detailIdx = (detailIdx + 1) % selectedProduct.images.length">&gt;</button>
+                            </template>
+                            <template x-if="selectedProduct.images.length > 1">
+                                <div class="carousel-dots">
+                                    <template x-for="(img, idx) in selectedProduct.images" :key="img">
+                                        <button class="carousel-dot" :class="{ active: idx === detailIdx }" @click="detailIdx = idx"></button>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!selectedProduct.images || selectedProduct.images.length === 0">
+                        <div class="gallery-img" style="height:400px;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary)">[IMAGE]</div>
+                    </template>
+                    <h1 style="font-size:20px;margin-bottom:20px" x-text="selectedProduct.name"></h1>
+                    <p style="font-size:18px;color:var(--accent);margin-bottom:20px">$<span x-text="selectedProduct.price.toFixed(2)"></span></p>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:28px" x-text="selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
+                    <template x-if="selectedProduct.description">
+                        <p style="font-size:10px;color:var(--text-secondary);margin-bottom:28px;line-height:2" x-text="selectedProduct.description"></p>
+                    </template>
+                    <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                </div>
+            </div>
             </div>
         </div>
     </template>
@@ -189,12 +196,18 @@
                 <h2 style="font-size:14px;margin-bottom:24px">Your Cart</h2>
                 <template x-if="!cart.length"><p style="font-size:10px">Cart is empty</p></template>
                 <template x-for="(item,i) in cart" :key="i">
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:2px dashed var(--border);font-size:10px">
-                        <span x-text="item.name"></span>
-                        <div style="display:flex;align-items:center;gap:12px">
-                            <span>$<span x-text="item.price.toFixed(2)"></span></span>
-                            <button class="btn btn-sm" @click="removeFromCart(i)" style="background:#dc2626">X</button>
+                    <div style="display:flex;align-items:center;padding:16px 0;border-bottom:2px dashed var(--border);gap:16px">
+                        <template x-if="item.images && item.images.length > 0">
+                            <img :src="item.images[0]" :alt="item.name" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">
+                        </template>
+                        <template x-if="!item.images || item.images.length === 0">
+                            <div style="width:80px;height:80px;background:var(--bg-secondary);border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:6px;color:var(--text-secondary)">[IMG]</div>
+                        </template>
+                        <div style="flex:1">
+                            <p style="font-size:10px;margin-bottom:6px" x-text="item.name"></p>
+                            <p style="font-size:10px;color:var(--accent)">$<span x-text="item.price.toFixed(2)"></span></p>
                         </div>
+                        <button class="btn btn-sm" @click="removeFromCart(i)" style="background:#dc2626">X</button>
                     </div>
                 </template>
                 <template x-if="cart.length">
@@ -347,6 +360,21 @@
                 },
 
                 async init(){
+                    // Load cart from localStorage
+                    const savedCart = localStorage.getItem('cart');
+                    if (savedCart) {
+                        try {
+                            this.cart = JSON.parse(savedCart);
+                        } catch(e) {
+                            this.cart = [];
+                        }
+                    }
+
+                    // Watch cart changes and save to localStorage
+                    this.$watch('cart', (value) => {
+                        localStorage.setItem('cart', JSON.stringify(value));
+                    });
+
                     await this.loadProducts();
                     this.initClerk();
                     this.initHistory();
@@ -500,6 +528,7 @@
                                 window.location.href = data.checkout_url;
                             } else {
                                 this.cart = [];
+                                localStorage.removeItem('cart');
                                 this.step = 4;
                                 this.orderMessage = 'Your order has been placed!';
                                 await this.loadOrders();
@@ -517,22 +546,26 @@
             }
         }
 
-        // Generate pixel stars
-        (function generateStars(){
-            const container=document.getElementById('stars');
-            const sizes=[2,3,4,6,8];
-            for(let i=0;i<60;i++){
-                const star=document.createElement('div');
-                star.className='star'+(Math.random()>0.6?' twinkle':'');
-                const size=sizes[Math.floor(Math.random()*sizes.length)];
-                star.style.width=size+'px';
-                star.style.height=size+'px';
-                star.style.left=Math.random()*100+'%';
-                star.style.top=Math.random()*100+'%';
-                star.style.animationDelay=Math.random()*2+'s';
+        // Generate pixel stars (squares only) - global for Alpine access
+        window.generateStarsIn = function(container, count = 60) {
+            if (!container) return;
+            container.innerHTML = '';
+            const sizes = [2, 4, 6, 8];
+            for (let i = 0; i < count; i++) {
+                const star = document.createElement('div');
+                star.className = 'star' + (Math.random() > 0.6 ? ' twinkle' : '');
+                const size = sizes[Math.floor(Math.random() * sizes.length)];
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 2 + 's';
                 container.appendChild(star);
             }
-        })();
+        };
+
+        // Generate stars for main page
+        window.generateStarsIn(document.getElementById('stars'));
 
         (function caterpillar(){
             const el=document.getElementById('caterpillar');
