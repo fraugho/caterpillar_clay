@@ -33,3 +33,7 @@ logs/
 
 # Build artifacts
 *.pdb
+
+# Wrangler local state
+.wrangler/
+node_modules/
