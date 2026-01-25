@@ -217,63 +217,68 @@
             }
         })();
 
-        // Initialize Clerk sign-in
+        // Initialize Clerk auth
         window.addEventListener('load', async () => {
             try {
                 await window.Clerk.load();
 
-                // If already signed in, redirect to home
+                const params = new URLSearchParams(window.location.search);
+                const redirect = params.get('redirect') || '/';
+                const mode = params.get('mode'); // 'signup' or null for sign-in
+
+                // If already signed in, redirect
                 if (window.Clerk.user) {
-                    // Check for redirect URL
-                    const params = new URLSearchParams(window.location.search);
-                    const redirect = params.get('redirect') || '/';
                     window.location.href = redirect;
                     return;
                 }
 
-                // Mount sign-in component
-                const signInDiv = document.getElementById('clerk-auth');
+                const authDiv = document.getElementById('clerk-auth');
                 const styles = getComputedStyle(document.documentElement);
                 const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-                window.Clerk.mountSignIn(signInDiv, {
-                    afterSignInUrl: new URLSearchParams(window.location.search).get('redirect') || '/',
-                    afterSignUpUrl: new URLSearchParams(window.location.search).get('redirect') || '/',
-                    appearance: {
-                        variables: {
-                            colorPrimary: '#97BAD9',
-                            colorText: styles.getPropertyValue('--text-primary').trim(),
-                            colorTextSecondary: '#97BAD9',
-                            colorBackground: styles.getPropertyValue('--bg-card').trim(),
-                            colorInputBackground: styles.getPropertyValue('--bg-secondary').trim(),
-                            colorInputText: styles.getPropertyValue('--text-primary').trim(),
-                            colorNeutral: '#97BAD9',
-                            borderRadius: '8px',
+                const appearance = {
+                    variables: {
+                        colorPrimary: '#97BAD9',
+                        colorText: styles.getPropertyValue('--text-primary').trim(),
+                        colorTextSecondary: '#97BAD9',
+                        colorBackground: styles.getPropertyValue('--bg-card').trim(),
+                        colorInputBackground: styles.getPropertyValue('--bg-secondary').trim(),
+                        colorInputText: styles.getPropertyValue('--text-primary').trim(),
+                        colorNeutral: '#97BAD9',
+                        borderRadius: '8px',
+                    },
+                    elements: {
+                        socialButtonsBlockButton: {
+                            backgroundColor: '#97BAD9',
+                            color: '#18191B',
+                            border: 'none',
+                            '&:hover': { backgroundColor: isDark ? '#AECCE8' : '#7BA3C9' }
                         },
-                        elements: {
-                            socialButtonsBlockButton: {
-                                backgroundColor: '#97BAD9',
-                                color: '#18191B',
-                                border: 'none',
-                                '&:hover': {
-                                    backgroundColor: isDark ? '#AECCE8' : '#7BA3C9'
-                                }
-                            },
-                            headerTitle: {
-                                color: isDark ? '#F8F8F8' : '#18191B'
-                            },
-                            dividerLine: {
-                                backgroundColor: '#97BAD9'
-                            },
-                            dividerText: {
-                                color: '#97BAD9'
-                            },
-                            formFieldInput: {
-                                borderColor: '#97BAD9'
-                            }
-                        }
+                        headerTitle: { color: isDark ? '#F8F8F8' : '#18191B' },
+                        dividerLine: { backgroundColor: '#97BAD9' },
+                        dividerText: { color: '#97BAD9' },
+                        formFieldInput: { borderColor: '#97BAD9' }
                     }
-                });
+                };
+
+                // Build URLs preserving redirect param
+                const signInUrl = redirect !== '/' ? `/login.html?redirect=${encodeURIComponent(redirect)}` : '/login.html';
+                const signUpUrl = redirect !== '/' ? `/login.html?mode=signup&redirect=${encodeURIComponent(redirect)}` : '/login.html?mode=signup';
+
+                if (mode === 'signup') {
+                    document.title = 'Sign Up - Caterpillar Clay';
+                    window.Clerk.mountSignUp(authDiv, {
+                        afterSignUpUrl: redirect,
+                        signInUrl: signInUrl,
+                        appearance
+                    });
+                } else {
+                    window.Clerk.mountSignIn(authDiv, {
+                        afterSignInUrl: redirect,
+                        signUpUrl: signUpUrl,
+                        appearance
+                    });
+                }
             } catch(e) {
                 console.error('Failed to load Clerk:', e);
                 document.getElementById('clerk-auth').innerHTML = '<p style="color:var(--text-secondary);font-size:8px">Authentication service unavailable</p>';
