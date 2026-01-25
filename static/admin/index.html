@@ -143,6 +143,7 @@
             <button class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">DASHBOARD</button>
             <button class="tab" :class="{ active: tab === 'products' }" @click="tab = 'products'; loadProducts()">PRODUCTS</button>
             <button class="tab" :class="{ active: tab === 'orders' }" @click="tab = 'orders'; loadOrders()">ORDERS</button>
+            <button class="tab" :class="{ active: tab === 'settings' }" @click="tab = 'settings'; loadArtistSettings()">ARTIST</button>
         </div>
 
         <!-- Dashboard -->
@@ -285,6 +286,50 @@
                         </template>
                     </tbody>
                 </table>
+            </div>
+        </template>
+
+        <!-- Settings -->
+        <template x-if="tab === 'settings'">
+            <div>
+                <div class="card">
+                    <h2>ABOUT THE ARTIST</h2>
+                    <div class="preview-section">
+                        <div class="form-section">
+                            <form @submit.prevent="saveArtistSettings()">
+                                <label>Photo</label>
+                                <div class="image-upload" @click="$refs.artistImageInput.click()">
+                                    <input type="file" x-ref="artistImageInput" @change="handleArtistImageSelect($event)" accept="image/*">
+                                    <template x-if="artistSettings.image">
+                                        <img :src="artistSettings.imagePreview || artistSettings.image" style="max-height:200px;border-radius:8px">
+                                    </template>
+                                    <template x-if="!artistSettings.image">
+                                        <p style="font-size:8px;color:var(--text-secondary)">Click to upload artist image</p>
+                                    </template>
+                                </div>
+
+                                <label style="margin-top:16px">Bio</label>
+                                <textarea x-model="artistSettings.description" rows="6" style="min-height:150px"></textarea>
+
+                                <button type="submit" class="btn" style="width: 100%; margin-top: 8px;" :disabled="savingArtist">
+                                    <span x-text="savingArtist ? 'SAVING...' : 'SAVE'"></span>
+                                </button>
+                            </form>
+                        </div>
+                        <div class="preview-card">
+                            <p style="font-size:8px;color:var(--text-secondary);margin-bottom:12px">ARTIST PAGE PREVIEW</p>
+                            <template x-if="artistSettings.imagePreview || artistSettings.image">
+                                <img :src="artistSettings.imagePreview || artistSettings.image" style="width:100%;max-height:300px;object-fit:cover;border-radius:8px;margin-bottom:12px">
+                            </template>
+                            <template x-if="!artistSettings.imagePreview && !artistSettings.image">
+                                <div class="preview-placeholder">[ARTIST IMAGE]</div>
+                            </template>
+                            <div style="background:var(--accent);border-radius:8px;padding:16px;margin-top:12px">
+                                <p style="font-size:8px;line-height:2;color:#18191B" x-text="artistSettings.description || 'Artist description will appear here...'"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </template>
     </div>
@@ -465,6 +510,8 @@
                 newImages: [],
                 dragIdx: null,
                 dragOverIdx: null,
+                artistSettings: { image: '', description: '', imagePreview: null, newImageFile: null },
+                savingArtist: false,
 
                 async init() {
                     // Load data for saved tab
@@ -472,6 +519,8 @@
                         await this.loadProducts();
                     } else if (this.tab === 'orders') {
                         await this.loadOrders();
+                    } else if (this.tab === 'settings') {
+                        await this.loadArtistSettings();
                     } else {
                         await this.loadDashboard();
                     }
@@ -712,6 +761,63 @@
                         await this.loadOrders();
                     } catch (e) {
                         console.error('Failed to save tracking:', e);
+                    }
+                },
+
+                async loadArtistSettings() {
+                    try {
+                        const res = await fetch('/admin/api/settings/artist');
+                        const data = await res.json();
+                        this.artistSettings = {
+                            image: data.image,
+                            description: data.description,
+                            imagePreview: null,
+                            newImageFile: null
+                        };
+                    } catch (e) {
+                        console.error('Failed to load artist settings:', e);
+                    }
+                },
+
+                handleArtistImageSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.artistSettings.newImageFile = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.artistSettings.imagePreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    event.target.value = '';
+                },
+
+                async saveArtistSettings() {
+                    this.savingArtist = true;
+                    try {
+                        // Upload new image if selected
+                        if (this.artistSettings.newImageFile) {
+                            const formData = new FormData();
+                            formData.append('file', this.artistSettings.newImageFile);
+                            await fetch('/admin/api/settings/artist/image', {
+                                method: 'PUT',
+                                body: formData
+                            });
+                        }
+
+                        // Save description
+                        await fetch('/admin/api/settings/artist', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ description: this.artistSettings.description })
+                        });
+
+                        // Reload to get updated data
+                        await this.loadArtistSettings();
+                    } catch (e) {
+                        console.error('Failed to save artist settings:', e);
+                    } finally {
+                        this.savingArtist = false;
                     }
                 },
 

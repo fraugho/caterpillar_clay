@@ -50,6 +50,7 @@
         .card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px}
         .artist-img{width:100%;max-width:400px;border-radius:12px;border:2px solid var(--border);margin-bottom:32px}
         .description{font-size:10px;line-height:2.2;color:var(--text-secondary)}
+        [x-cloak]{display:none !important}
     </style>
 </head>
 <body x-data="artistPage()">
@@ -87,12 +88,10 @@
         <div class="card" style="text-align:center">
             <h1 style="font-size:16px;margin-bottom:32px;color:#97BAD9">Meet the Artist</h1>
 
-            <img src="/artist/Alex.webp" alt="The Artist" class="artist-img">
+            <img :src="artistInfo.image" alt="The Artist" class="artist-img" x-cloak x-show="artistInfo.image">
 
             <div style="background:#97BAD9;border-radius:12px;padding:24px;max-width:600px;margin:0 auto">
-                <p style="font-size:10px;line-height:2.2;color:#18191B">
-                    I am currently a college student who started on the pottery wheel 10 years ago as a second grader. Since then I have kept with pottery, and I now enjoy making dinnerware and other vessels. I primarily work with blue underglaze or cobalt slip at cone 6, hand painted or slip-trailed. My pieces go through 3 firings to ensure image clarity, and are inspired by flowers I see in the local area!
-                </p>
+                <p style="font-size:10px;line-height:2.2;color:#18191B" x-text="artistInfo.description"></p>
             </div>
         </div>
     </div>
@@ -104,6 +103,7 @@
                 user: null,
                 showUserMenu: false,
                 initializing: true,
+                artistInfo: { image: '', description: '' },
 
                 get cartItemCount() {
                     return this.cart.reduce((a, b) => a + (b.quantity || 1), 0);
@@ -119,8 +119,23 @@
                             this.cart = [];
                         }
                     }
+                    await this.loadArtistInfo();
                     await this.initClerk();
                     this.initializing = false;
+                },
+
+                async loadArtistInfo() {
+                    try {
+                        const res = await fetch('/api/artist');
+                        this.artistInfo = await res.json();
+                    } catch(e) {
+                        console.error('Failed to load artist info:', e);
+                        // Fallback to defaults
+                        this.artistInfo = {
+                            image: '/artist/Alex.webp',
+                            description: ''
+                        };
+                    }
                 },
 
                 async initClerk() {

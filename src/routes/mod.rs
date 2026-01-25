@@ -3,6 +3,7 @@ pub mod auth;
 pub mod cart;
 pub mod orders;
 pub mod products;
+pub mod settings;
 pub mod webhooks;
 
 use axum::{middleware, response::IntoResponse, Router};
@@ -33,7 +34,8 @@ pub fn create_router(state: AppState) -> Router {
     let public_routes = Router::new()
         .merge(products::public_routes())
         .merge(auth::routes())
-        .merge(webhooks::routes());
+        .merge(webhooks::routes())
+        .merge(settings::routes());
 
     let protected_routes = Router::new()
         .merge(orders::routes())
