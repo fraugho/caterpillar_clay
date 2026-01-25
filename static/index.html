@@ -80,7 +80,7 @@
     <!-- Product Detail Overlay -->
     <template x-if="selectedProduct">
         <div class="detail-overlay">
-            <button class="back-btn" @click="selectedProduct=null">← BACK</button>
+            <button class="back-btn" @click="closeProduct()">← BACK</button>
             <div style="max-width:600px;margin:60px auto;text-align:center">
                 <template x-if="selectedProduct.image_url">
                     <img :src="selectedProduct.image_url" :alt="selectedProduct.name" class="gallery-img">
@@ -94,7 +94,7 @@
                 <template x-if="selectedProduct.description">
                     <p style="font-size:8px;color:var(--text-secondary);margin-bottom:24px;line-height:1.8" x-text="selectedProduct.description"></p>
                 </template>
-                <button class="btn" style="max-width:400px;margin:0 auto" @click="addToCart(selectedProduct);selectedProduct=null" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                <button class="btn" style="max-width:400px;margin:0 auto" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
             </div>
         </div>
     </template>
@@ -103,10 +103,10 @@
         <div style="max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
             <span style="font-size:12px">CATERPILLAR CLAY</span>
             <div style="display:flex;gap:24px;font-size:10px;align-items:center">
-                <a href="#" @click.prevent="page='home'" style="color:#fff;text-decoration:none">HOME</a>
-                <a href="#" @click.prevent="page='cart'" style="color:#fff;text-decoration:none">CART (<span x-text="cart.length"></span>)</a>
+                <a href="#" @click.prevent="navigateToPage('home')" style="color:#fff;text-decoration:none">HOME</a>
+                <a href="#" @click.prevent="navigateToPage('cart')" style="color:#fff;text-decoration:none">CART (<span x-text="cart.length"></span>)</a>
                 <template x-if="user">
-                    <a href="#" @click.prevent="page='orders'" style="color:#fff;text-decoration:none">MY ORDERS</a>
+                    <a href="#" @click.prevent="navigateToPage('orders')" style="color:#fff;text-decoration:none">MY ORDERS</a>
                 </template>
                 <template x-if="!user">
                     <button class="auth-btn" @click="signIn()">SIGN IN</button>
@@ -115,7 +115,7 @@
                     <div class="user-menu">
                         <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user.firstName || 'Account'"></button>
                         <div class="user-dropdown" :class="{ show: showUserMenu }">
-                            <a href="#" @click.prevent="page='orders'; showUserMenu=false">My Orders</a>
+                            <a href="#" @click.prevent="navigateToPage('orders'); showUserMenu=false">My Orders</a>
                             <template x-if="user.isAdmin">
                                 <a href="/admin/">Admin Panel</a>
                             </template>
@@ -134,7 +134,7 @@
                 <h2 style="font-size:14px;margin-bottom:24px">Fresh from the Kiln</h2>
                 <div :class="{ loading: loadingProducts }" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px">
                     <template x-for="p in products" :key="p.id">
-                        <div class="card product-card" style="padding:20px;text-align:center" @click="selectedProduct=p">
+                        <div class="card product-card" style="padding:20px;text-align:center" @click="navigateToProduct(p)">
                             <template x-if="p.image_url">
                                 <img :src="p.image_url" :alt="p.name" class="product-img">
                             </template>
@@ -171,7 +171,7 @@
                 <template x-if="cart.length">
                     <div style="margin-top:24px">
                         <p style="font-size:12px;margin-bottom:16px">Total: $<span x-text="cartTotal.toFixed(2)"></span></p>
-                        <button class="btn" @click="page='checkout';step=1">CHECKOUT</button>
+                        <button class="btn" @click="navigateToPage('checkout');step=1">CHECKOUT</button>
                     </div>
                 </template>
             </div>
@@ -248,7 +248,7 @@
                         <p style="font-size:12px;margin-bottom:8px">Order Complete!</p>
                         <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px">The caterpillar is happy</p>
                         <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px" x-text="orderMessage"></p>
-                        <button class="btn" @click="page='orders'">VIEW MY ORDERS</button>
+                        <button class="btn" @click="navigateToPage('orders')">VIEW MY ORDERS</button>
                     </div>
                 </template>
             </div>
@@ -268,7 +268,7 @@
                     <p style="font-size:10px">Loading orders...</p>
                 </template>
                 <template x-if="user && !loadingOrders && orders.length === 0">
-                    <p style="font-size:10px">No orders yet. <a href="#" @click.prevent="page='home'" style="color:var(--accent)">Start shopping!</a></p>
+                    <p style="font-size:10px">No orders yet. <a href="#" @click.prevent="navigateToPage('home')" style="color:var(--accent)">Start shopping!</a></p>
                 </template>
                 <template x-for="order in orders" :key="order.id">
                     <div class="order-card">
@@ -320,6 +320,46 @@
                 async init(){
                     await this.loadProducts();
                     this.initClerk();
+                    this.initHistory();
+                },
+
+                initHistory(){
+                    // Handle browser back/forward buttons
+                    window.addEventListener('popstate', (e) => {
+                        if(e.state){
+                            if(e.state.productId){
+                                const p = this.products.find(pr => pr.id === e.state.productId);
+                                if(p) this.selectedProduct = p;
+                                else this.selectedProduct = null;
+                            } else {
+                                this.selectedProduct = null;
+                            }
+                            if(e.state.page) this.page = e.state.page;
+                        } else {
+                            this.selectedProduct = null;
+                            this.page = 'home';
+                        }
+                    });
+
+                    // Set initial state
+                    history.replaceState({ page: 'home' }, '', '/');
+                },
+
+                navigateToProduct(product){
+                    this.selectedProduct = product;
+                    history.pushState({ page: this.page, productId: product.id }, '', `/product/${product.id}`);
+                },
+
+                closeProduct(){
+                    this.selectedProduct = null;
+                    history.pushState({ page: this.page }, '', '/');
+                },
+
+                navigateToPage(pageName){
+                    this.page = pageName;
+                    this.selectedProduct = null;
+                    const url = pageName === 'home' ? '/' : `/${pageName}`;
+                    history.pushState({ page: pageName }, '', url);
                 },
 
                 async initClerk(){
