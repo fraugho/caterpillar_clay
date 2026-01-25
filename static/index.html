@@ -49,6 +49,7 @@
         .btn-sm{padding:8px 12px;font-size:6px;width:auto;border-radius:6px}
         input,textarea{width:100%;padding:12px;font-family:inherit;font-size:8px;margin-bottom:16px;border:2px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary)}
         #caterpillar{position:fixed;pointer-events:none;z-index:9999;will-change:transform;left:0;top:0}
+        [x-cloak]{display:none !important}
         .loading{opacity:0.6;pointer-events:none}
         .product-img{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);border:2px solid var(--border);border-radius:8px;margin-bottom:12px;transition:transform .2s}
         .product-card{cursor:none;transition:transform .2s,box-shadow .2s;will-change:transform;backface-visibility:hidden}
@@ -82,6 +83,10 @@
         .carousel-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.5);border:none;cursor:none}
         .carousel-dot.active{background:#fff}
         .detail-carousel{width:100%;height:650px;margin:0 auto 32px}
+        @media(max-width:768px){
+            .detail-carousel{height:300px;margin:0 auto 20px}
+            .detail-content>div{margin-top:20px !important}
+        }
     </style>
 </head>
 <body x-data="shop()">
@@ -130,12 +135,33 @@
                     </template>
                     <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
                 </div>
+
+                <!-- You may also like -->
+                <template x-if="products.filter(p => p.id !== selectedProduct.id).length > 0">
+                    <div style="margin-top:40px">
+                        <h3 style="font-size:12px;margin-bottom:20px;text-align:center">You may also like</h3>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px">
+                            <template x-for="p in products.filter(p => p.id !== selectedProduct.id)" :key="p.id">
+                                <div class="card product-card" style="padding:16px;text-align:center;cursor:none" @click="detailIdx = 0; selectedProduct = p; history.pushState({ page: page, productId: p.id }, '', `/product/${p.id}`)">
+                                    <template x-if="p.images && p.images.length > 0">
+                                        <img :src="p.images[0]" :alt="p.name" style="width:100%;height:280px;object-fit:cover;border-radius:8px;border:2px solid var(--border);margin-bottom:12px">
+                                    </template>
+                                    <template x-if="!p.images || p.images.length === 0">
+                                        <div style="width:100%;height:280px;background:var(--bg-secondary);border-radius:8px;border:2px solid var(--border);margin-bottom:12px;display:flex;align-items:center;justify-content:center;font-size:8px">[IMAGE]</div>
+                                    </template>
+                                    <p style="font-size:10px;margin-bottom:8px" x-text="p.name"></p>
+                                    <p style="font-size:11px;color:var(--accent)">$<span x-text="p.price.toFixed(2)"></span></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
             </div>
         </div>
     </template>
 
-    <nav style="background:var(--accent);padding:20px">
+    <nav x-cloak x-show="!initializing" style="background:var(--accent);padding:20px">
         <div style="max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
             <span style="font-size:12px">CATERPILLAR CLAY</span>
             <div style="display:flex;gap:24px;font-size:10px;align-items:center">
@@ -163,7 +189,7 @@
         </div>
     </nav>
 
-    <main style="max-width:900px;margin:40px auto;padding:0 20px">
+    <main x-cloak x-show="!initializing" style="max-width:900px;margin:40px auto;padding:0 20px">
         <!-- Home / Products -->
         <template x-if="page=='home'">
             <div class="card" style="padding:32px">
@@ -344,11 +370,13 @@
                 orders:[],
                 user:null,
                 showUserMenu:false,
+                initializing:true,
                 loadingProducts:true,
                 loadingOrders:false,
                 processingOrder:false,
                 orderMessage:'',
                 selectedProduct:null,
+                pendingProductId:null,
                 shipping:{name:'',street:'',city:'',state:'',zip:'',country:'USA'},
 
                 get cartTotal(){
@@ -360,6 +388,18 @@
                 },
 
                 async init(){
+                    // Check URL for pending product before loading
+                    const path = window.location.pathname;
+                    if (path.startsWith('/product/')) {
+                        this.pendingProductId = path.replace('/product/', '');
+                    } else if (path === '/cart') {
+                        this.page = 'cart';
+                    } else if (path === '/orders') {
+                        this.page = 'orders';
+                    } else if (path === '/checkout') {
+                        this.page = 'checkout';
+                    }
+
                     // Load cart from localStorage
                     const savedCart = localStorage.getItem('cart');
                     if (savedCart) {
@@ -376,8 +416,19 @@
                     });
 
                     await this.loadProducts();
+
+                    // Now handle pending product after products loaded
+                    if (this.pendingProductId) {
+                        const p = this.products.find(pr => pr.id === this.pendingProductId);
+                        if (p) {
+                            this.selectedProduct = p;
+                        }
+                        this.pendingProductId = null;
+                    }
+
                     this.initClerk();
                     this.initHistory();
+                    this.initializing = false;
                 },
 
                 initHistory(){
@@ -398,8 +449,15 @@
                         }
                     });
 
-                    // Set initial state
-                    history.replaceState({ page: 'home' }, '', '/');
+                    // Set initial history state based on current URL
+                    const path = window.location.pathname;
+                    if (path.startsWith('/product/') && this.selectedProduct) {
+                        history.replaceState({ page: this.page, productId: this.selectedProduct.id }, '', path);
+                    } else if (path === '/cart' || path === '/orders' || path === '/checkout') {
+                        history.replaceState({ page: this.page }, '', path);
+                    } else {
+                        history.replaceState({ page: 'home' }, '', '/');
+                    }
                 },
 
                 navigateToProduct(product){

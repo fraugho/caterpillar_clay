@@ -5,11 +5,12 @@ pub mod orders;
 pub mod products;
 pub mod webhooks;
 
-use axum::{middleware, Router};
+use axum::{middleware, response::IntoResponse, Router};
+use axum::http::StatusCode;
 use libsql::Database;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
@@ -50,7 +51,9 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api", protected_routes)
         .nest("/admin", admin_routes)
         .nest_service("/uploads", ServeDir::new(&state.config.upload_dir))
-        .fallback_service(ServeDir::new("static"))
+        .fallback_service(
+            ServeDir::new("static").fallback(ServeFile::new("static/index.html"))
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)
