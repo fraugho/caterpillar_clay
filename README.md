@@ -18,7 +18,7 @@ Recent changes to get you up to speed:
 | **Artist page** | `/artist.html` shows artist bio and image, fetched from `site_settings`. |
 | **Admin artist settings** | Admin panel ARTIST tab lets you update artist photo and bio. |
 | **Centered header** | Logo centered, ARTIST on left, CART/account on right. |
-| **Newsletter** | Visitors can subscribe to get notified when new products are added. Uses Resend. |
+| **Newsletter** | Visitors can subscribe. Admin can send "New Product" or "Back in Stock" emails via buttons on product cards. Uses Resend. |
 
 ### Key Files to Know
 
@@ -30,6 +30,7 @@ Recent changes to get you up to speed:
 | `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
 | `src/routes/admin/settings.rs` | Admin artist settings API |
 | `src/routes/newsletter.rs` | Newsletter subscribe/unsubscribe API |
+| `src/routes/admin/newsletter.rs` | Admin newsletter notify endpoints |
 | `src/services/resend.rs` | Resend email service for newsletters |
 | `src/models/settings.rs` | Site settings model (artist info) |
 | `src/models/newsletter.rs` | Newsletter subscriber model |

@@ -423,6 +423,7 @@
                 subscribing:false,
                 newsletterMessage:'',
                 newsletterSuccess:false,
+                subscribedEmails:new Set(),
                 processingOrder:false,
                 orderMessage:'',
                 selectedProduct:null,
@@ -603,18 +604,20 @@
                 },
 
                 async subscribeNewsletter(){
-                    if(!this.newsletterEmail) return;
+                    const email = this.newsletterEmail.toLowerCase().trim();
+                    if(!email || this.subscribedEmails.has(email)) return;
                     this.subscribing = true;
                     this.newsletterMessage = '';
                     try {
                         const res = await fetch('/api/newsletter/subscribe', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email: this.newsletterEmail })
+                            body: JSON.stringify({ email: email })
                         });
                         const data = await res.json();
                         this.newsletterSuccess = data.success;
                         this.newsletterMessage = data.message;
+                        if(data.success) this.subscribedEmails.add(email);
                     } catch(e) {
                         this.newsletterSuccess = false;
                         this.newsletterMessage = 'Something went wrong. Please try again.';

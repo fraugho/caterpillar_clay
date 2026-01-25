@@ -40,7 +40,7 @@ impl Config {
             smtp_user: env::var("SMTP_USER").unwrap_or_else(|_| "resend".to_string()),
             smtp_pass: env::var("SMTP_PASS")?,
             from_email: env::var("FROM_EMAIL")
-                .unwrap_or_else(|_| "orders@caterpillarclay.com".to_string()),
+                .unwrap_or_else(|_| "CaterpillarClay@caterpillarclay.com".to_string()),
             resend_api_key: env::var("RESEND_API_KEY").ok(),
             storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
             upload_dir: env::var("UPLOAD_DIR").unwrap_or_else(|_| "./static/uploads".to_string()),
