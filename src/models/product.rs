@@ -5,6 +5,121 @@ use uuid::Uuid;
 use crate::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductImage {
+    pub id: String,
+    pub product_id: String,
+    pub image_path: String,
+    pub sort_order: i32,
+    pub created_ts: i64,
+}
+
+impl ProductImage {
+    fn from_row(row: &libsql::Row) -> Result<Self, libsql::Error> {
+        Ok(Self {
+            id: row.get(0)?,
+            product_id: row.get(1)?,
+            image_path: row.get(2)?,
+            sort_order: row.get(3)?,
+            created_ts: row.get(4)?,
+        })
+    }
+
+    pub async fn list_by_product(conn: &Connection, product_id: &str) -> AppResult<Vec<Self>> {
+        let mut rows = conn
+            .query(
+                "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC",
+                [product_id],
+            )
+            .await
+            .map_err(AppError::from)?;
+
+        let mut images = Vec::new();
+        while let Some(row) = rows.next().await.map_err(AppError::from)? {
+            images.push(Self::from_row(&row).map_err(AppError::from)?);
+        }
+        Ok(images)
+    }
+
+    pub async fn add(conn: &Connection, product_id: &str, image_path: &str) -> AppResult<Self> {
+        let id = Uuid::new_v4().to_string();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        // Get next sort order
+        let mut rows = conn
+            .query(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM product_images WHERE product_id = ?",
+                [product_id],
+            )
+            .await
+            .map_err(AppError::from)?;
+
+        let sort_order: i32 = match rows.next().await.map_err(AppError::from)? {
+            Some(row) => row.get(0).unwrap_or(0),
+            None => 0,
+        };
+
+        conn.execute(
+            "INSERT INTO product_images (id, product_id, image_path, sort_order, created_ts) VALUES (?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), product_id.to_string(), image_path.to_string(), sort_order, now],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(Self {
+            id,
+            product_id: product_id.to_string(),
+            image_path: image_path.to_string(),
+            sort_order,
+            created_ts: now,
+        })
+    }
+
+    pub async fn delete(conn: &Connection, id: &str) -> AppResult<()> {
+        conn.execute("DELETE FROM product_images WHERE id = ?", [id.to_string()])
+            .await
+            .map_err(AppError::from)?;
+        Ok(())
+    }
+
+    pub async fn delete_by_product(conn: &Connection, product_id: &str) -> AppResult<()> {
+        conn.execute(
+            "DELETE FROM product_images WHERE product_id = ?",
+            [product_id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
+    }
+
+    pub async fn reorder(conn: &Connection, product_id: &str, image_ids: &[String]) -> AppResult<()> {
+        for (idx, image_id) in image_ids.iter().enumerate() {
+            conn.execute(
+                "UPDATE product_images SET sort_order = ? WHERE id = ? AND product_id = ?",
+                libsql::params![idx as i32, image_id.to_string(), product_id.to_string()],
+            )
+            .await
+            .map_err(AppError::from)?;
+        }
+        Ok(())
+    }
+
+    pub async fn find_by_id(conn: &Connection, id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM product_images WHERE id = ?", [id])
+            .await
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Product {
     pub id: String,
     pub name: String,

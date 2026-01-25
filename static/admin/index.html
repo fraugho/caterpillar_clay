@@ -76,24 +76,26 @@
         .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
         .modal-header h3{font-size:10px;color:var(--accent)}
         .close-btn{background:none;border:none;color:var(--text-secondary);font-size:16px;cursor:pointer}
-        .product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px}
-        .product-card{background:var(--bg-card);padding:20px;border:2px solid var(--border);border-radius:12px;text-align:center;transition:transform .2s,box-shadow .2s}
+        .product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px}
+        .product-card{background:var(--bg-card);padding:24px;border:2px solid var(--border);border-radius:12px;text-align:center;transition:transform .2s,box-shadow .2s}
         .product-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-        .product-card img,.product-card .placeholder-img{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);margin-bottom:12px;border:2px solid var(--border);border-radius:8px}
+        .product-card img,.product-card .placeholder-img,.product-card .carousel{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);margin-bottom:20px;border:2px solid var(--border);border-radius:8px}
         .product-card .placeholder-img{display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-secondary)}
-        .product-card h4{font-size:10px;margin-bottom:10px}
-        .product-card .price{color:var(--accent);font-size:12px;margin-bottom:10px}
-        .product-card .stock{font-size:8px;color:var(--text-secondary);margin-bottom:14px}
-        .product-actions{display:flex;gap:8px;margin-top:12px;justify-content:center}
+        .product-card h4{font-size:12px;margin-top:8px;margin-bottom:12px}
+        .product-card .price{color:var(--accent);font-size:14px;margin-bottom:12px}
+        .product-card .stock{font-size:10px;color:var(--text-secondary);margin-bottom:16px}
+        .product-card .active-status{font-size:10px;margin-left:8px;color:var(--text-secondary)}
+        .product-actions{display:flex;gap:12px;margin-top:16px;justify-content:center}
+        .product-actions .btn{padding:12px 20px;font-size:10px}
         .alert{padding:12px;margin-bottom:16px;font-size:8px;border-radius:8px}
         .alert-warning{background:#fef3c7;color:#92400e}
         .alert-success{background:#d1fae5;color:#065f46}
-        .toggle{position:relative;display:inline-block;width:40px;height:20px}
+        .toggle{position:relative;display:inline-block;width:48px;height:24px}
         .toggle input{opacity:0;width:0;height:0}
-        .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);transition:.3s;border-radius:10px}
-        .toggle-slider:before{position:absolute;content:"";height:14px;width:14px;left:3px;bottom:3px;background:var(--text-secondary);transition:.3s;border-radius:50%}
+        .toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);transition:.3s;border-radius:12px}
+        .toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:var(--text-secondary);transition:.3s;border-radius:50%}
         .toggle input:checked+.toggle-slider{background:#22c55e}
-        .toggle input:checked+.toggle-slider:before{transform:translateX(20px);background:#fff}
+        .toggle input:checked+.toggle-slider:before{transform:translateX(24px);background:#fff}
         .preview-section{display:grid;grid-template-columns:1fr 1fr;gap:24px}
         .form-section,.preview-card{padding:20px}
         .preview-card{background:var(--bg-secondary);border:2px solid var(--border);border-radius:12px;text-align:center}
@@ -107,6 +109,22 @@
         .image-upload:hover{border-color:var(--accent)}
         .image-upload input{display:none}
         .image-upload img{max-width:100%;max-height:200px;margin-top:12px;border-radius:8px}
+        .image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:12px}
+        .image-item{position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid var(--border);border-radius:8px;overflow:hidden;cursor:grab}
+        .image-item.dragging{opacity:0.5;border-color:var(--accent)}
+        .image-item.drag-over{border-color:var(--accent);border-style:dashed}
+        .image-item img{width:100%;height:100%;object-fit:cover}
+        .image-item .delete-btn{position:absolute;top:4px;right:4px;background:rgba(220,38,38,0.9);color:#fff;border:none;width:20px;height:20px;border-radius:4px;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center}
+        .image-item .order-badge{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.7);color:#fff;font-size:6px;padding:2px 6px;border-radius:4px}
+        .carousel{position:relative;width:100%;height:380px;overflow:hidden;border-radius:8px}
+        .carousel-inner{display:flex;transition:transform 0.3s ease;height:100%}
+        .carousel-inner img{min-width:100%;height:100%;object-fit:cover}
+        .carousel-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.5);color:#fff;border:none;padding:8px 12px;cursor:pointer;font-size:12px;border-radius:4px}
+        .carousel-btn.prev{left:8px}
+        .carousel-btn.next{right:8px}
+        .carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+        .carousel-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);border:none;cursor:pointer}
+        .carousel-dot.active{background:#fff}
         @media(max-width:768px){.preview-section{grid-template-columns:1fr}}
     </style>
 </head>
@@ -186,26 +204,45 @@
 
                 <div class="product-grid">
                     <template x-for="p in products" :key="p.id">
-                        <div class="product-card">
-                            <template x-if="p.image_url">
-                                <img :src="p.image_url" :alt="p.name">
+                        <div class="product-card" x-data="{ carouselIdx: 0 }">
+                            <template x-if="p.images && p.images.length > 0">
+                                <div class="carousel">
+                                    <div class="carousel-inner" :style="`transform: translateX(-${carouselIdx * 100}%)`">
+                                        <template x-for="img in p.images" :key="img.id">
+                                            <img :src="img.image_url" :alt="p.name">
+                                        </template>
+                                    </div>
+                                    <template x-if="p.images.length > 1">
+                                        <button class="carousel-btn prev" @click="carouselIdx = (carouselIdx - 1 + p.images.length) % p.images.length">&lt;</button>
+                                    </template>
+                                    <template x-if="p.images.length > 1">
+                                        <button class="carousel-btn next" @click="carouselIdx = (carouselIdx + 1) % p.images.length">&gt;</button>
+                                    </template>
+                                    <template x-if="p.images.length > 1">
+                                        <div class="carousel-dots">
+                                            <template x-for="(img, idx) in p.images" :key="img.id">
+                                                <button class="carousel-dot" :class="{ active: idx === carouselIdx }" @click="carouselIdx = idx"></button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
                             </template>
-                            <template x-if="!p.image_url">
+                            <template x-if="!p.images || p.images.length === 0">
                                 <div class="placeholder-img">[NO IMAGE]</div>
                             </template>
                             <h4 x-text="p.name"></h4>
                             <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
                             <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
-                            <div style="margin-top: 8px;">
+                            <div style="margin-top: 12px; display: flex; align-items: center; justify-content: center;">
                                 <label class="toggle">
                                     <input type="checkbox" :checked="p.is_active" @change="toggleProductActive(p)">
                                     <span class="toggle-slider"></span>
                                 </label>
-                                <span style="font-size: 6px; margin-left: 4px;" x-text="p.is_active ? 'Active' : 'Inactive'"></span>
+                                <span class="active-status" x-text="p.is_active ? 'Active' : 'Inactive'"></span>
                             </div>
                             <div class="product-actions">
-                                <button class="btn btn-sm" @click="editProduct(p)">EDIT</button>
-                                <button class="btn btn-sm btn-danger" @click="deleteProduct(p.id)">DELETE</button>
+                                <button class="btn" @click="editProduct(p)">EDIT</button>
+                                <button class="btn btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
                         </div>
                     </template>
@@ -262,18 +299,32 @@
             <div class="preview-section">
                 <div class="form-section">
                     <form @submit.prevent="saveProduct()">
-                        <label>Product Image</label>
-                        <div class="image-upload" @click="$refs.imageInput.click()">
-                            <input type="file" x-ref="imageInput" @change="handleImageSelect($event)" accept="image/*">
-                            <template x-if="!previewImage">
-                                <p style="font-size:8px;color:var(--text-secondary)">Click to upload image</p>
-                            </template>
-                            <template x-if="previewImage">
-                                <img :src="previewImage" alt="Preview">
-                            </template>
+                        <label>Product Images <span style="font-size:6px;color:var(--text-secondary)">(drag to reorder)</span></label>
+                        <div class="image-upload" @click="$refs.imageInput.click()" @dragover.prevent @drop.prevent="handleImageDrop($event)">
+                            <input type="file" x-ref="imageInput" @change="handleImageSelect($event)" accept="image/*" multiple>
+                            <p style="font-size:8px;color:var(--text-secondary)">Click or drop images here</p>
                         </div>
 
-                        <label>Name</label>
+                        <template x-if="productImages.length > 0">
+                            <div class="image-grid">
+                                <template x-for="(img, idx) in productImages" :key="img.id || idx">
+                                    <div class="image-item"
+                                         :class="{ dragging: dragIdx === idx, 'drag-over': dragOverIdx === idx }"
+                                         draggable="true"
+                                         @dragstart="startDrag(idx)"
+                                         @dragend="endDrag()"
+                                         @dragover.prevent="dragOverIdx = idx"
+                                         @dragleave="dragOverIdx = null"
+                                         @drop.prevent="handleDrop(idx)">
+                                        <img :src="img.image_url || img.preview" :alt="'Image ' + (idx + 1)">
+                                        <button type="button" class="delete-btn" @click.stop="removeImage(idx, img)">&times;</button>
+                                        <span class="order-badge" x-text="idx + 1"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <label style="margin-top:16px">Name</label>
                         <input type="text" x-model="productForm.name" required>
 
                         <label>Description</label>
@@ -293,12 +344,24 @@
                         <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">SAVE PRODUCT</button>
                     </form>
                 </div>
-                <div class="preview-card">
+                <div class="preview-card" x-data="{ previewIdx: 0 }">
                     <p style="font-size:8px;color:var(--text-secondary);margin-bottom:12px">LISTING PREVIEW</p>
-                    <template x-if="previewImage">
-                        <img :src="previewImage" alt="Preview">
+                    <template x-if="productImages.length > 0">
+                        <div class="carousel" style="height:300px">
+                            <div class="carousel-inner" :style="`transform: translateX(-${previewIdx * 100}%)`">
+                                <template x-for="img in productImages" :key="img.id || img.preview">
+                                    <img :src="img.image_url || img.preview" alt="Preview">
+                                </template>
+                            </div>
+                            <template x-if="productImages.length > 1">
+                                <button class="carousel-btn prev" @click="previewIdx = (previewIdx - 1 + productImages.length) % productImages.length">&lt;</button>
+                            </template>
+                            <template x-if="productImages.length > 1">
+                                <button class="carousel-btn next" @click="previewIdx = (previewIdx + 1) % productImages.length">&gt;</button>
+                            </template>
+                        </div>
                     </template>
-                    <template x-if="!previewImage">
+                    <template x-if="productImages.length === 0">
                         <div class="preview-placeholder">[IMAGE]</div>
                     </template>
                     <h4 x-text="productForm.name || 'Product Name'"></h4>
@@ -386,7 +449,7 @@
 
         function admin() {
             return {
-                tab: 'dashboard',
+                tab: localStorage.getItem('adminTab') || 'dashboard',
                 dashboard: {},
                 products: [],
                 orders: [],
@@ -398,11 +461,25 @@
                 trackingOrderId: null,
                 productForm: { name: '', description: '', price: 0, stock_quantity: 0 },
                 trackingForm: { tracking_number: '', carrier: '' },
-                previewImage: null,
-                selectedFile: null,
+                productImages: [],
+                newImages: [],
+                dragIdx: null,
+                dragOverIdx: null,
 
                 async init() {
-                    await this.loadDashboard();
+                    // Load data for saved tab
+                    if (this.tab === 'products') {
+                        await this.loadProducts();
+                    } else if (this.tab === 'orders') {
+                        await this.loadOrders();
+                    } else {
+                        await this.loadDashboard();
+                    }
+
+                    // Watch for tab changes and save to localStorage
+                    this.$watch('tab', (value) => {
+                        localStorage.setItem('adminTab', value);
+                    });
                 },
 
                 async loadDashboard() {
@@ -435,8 +512,8 @@
                 openProductModal() {
                     this.editingProduct = null;
                     this.productForm = { name: '', description: '', price: 0, stock_quantity: 0 };
-                    this.previewImage = null;
-                    this.selectedFile = null;
+                    this.productImages = [];
+                    this.newImages = [];
                     this.showProductModal = true;
                 },
 
@@ -448,20 +525,74 @@
                         price: product.price,
                         stock_quantity: product.stock_quantity
                     };
-                    this.previewImage = product.image_url || null;
-                    this.selectedFile = null;
+                    this.productImages = (product.images || []).map(img => ({
+                        id: img.id,
+                        image_url: img.image_url,
+                        isExisting: true
+                    }));
+                    this.newImages = [];
                     this.showProductModal = true;
                 },
 
                 handleImageSelect(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    this.selectedFile = file;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        this.previewImage = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
+                    const files = Array.from(event.target.files);
+                    this.addImages(files);
+                    event.target.value = '';
+                },
+
+                handleImageDrop(event) {
+                    const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                    this.addImages(files);
+                },
+
+                addImages(files) {
+                    files.forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.productImages.push({
+                                file: file,
+                                preview: e.target.result,
+                                isNew: true
+                            });
+                            this.newImages.push(file);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                },
+
+                startDrag(idx) {
+                    this.dragIdx = idx;
+                },
+
+                endDrag() {
+                    this.dragIdx = null;
+                    this.dragOverIdx = null;
+                },
+
+                handleDrop(targetIdx) {
+                    if (this.dragIdx === null || this.dragIdx === targetIdx) return;
+                    const item = this.productImages.splice(this.dragIdx, 1)[0];
+                    this.productImages.splice(targetIdx, 0, item);
+                    this.dragIdx = null;
+                    this.dragOverIdx = null;
+                },
+
+                async removeImage(idx, img) {
+                    if (img.isExisting && this.editingProduct) {
+                        try {
+                            await fetch(`/admin/api/products/${this.editingProduct.id}/images/${img.id}`, {
+                                method: 'DELETE'
+                            });
+                        } catch (e) {
+                            console.error('Failed to delete image:', e);
+                            return;
+                        }
+                    }
+                    this.productImages.splice(idx, 1);
+                    if (img.isNew) {
+                        const fileIdx = this.newImages.indexOf(img.file);
+                        if (fileIdx > -1) this.newImages.splice(fileIdx, 1);
+                    }
                 },
 
                 async saveProduct() {
@@ -492,19 +623,31 @@
                             productId = created.id;
                         }
 
-                        // Upload image if selected
-                        if (this.selectedFile && productId) {
+                        // Upload new images
+                        for (const file of this.newImages) {
                             const formData = new FormData();
-                            formData.append('file', this.selectedFile);
-                            await fetch(`/admin/api/products/${productId}/image`, {
+                            formData.append('file', file);
+                            await fetch(`/admin/api/products/${productId}/images`, {
                                 method: 'POST',
                                 body: formData
                             });
                         }
 
+                        // Reorder if editing and order changed
+                        if (this.editingProduct) {
+                            const imageIds = this.productImages.filter(img => img.isExisting).map(img => img.id);
+                            if (imageIds.length > 0) {
+                                await fetch(`/admin/api/products/${productId}/images/reorder`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ image_ids: imageIds })
+                                });
+                            }
+                        }
+
                         this.showProductModal = false;
-                        this.previewImage = null;
-                        this.selectedFile = null;
+                        this.productImages = [];
+                        this.newImages = [];
                         await this.loadProducts();
                     } catch (e) {
                         console.error('Failed to save product:', e);

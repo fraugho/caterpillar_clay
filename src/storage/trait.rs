@@ -19,6 +19,8 @@ pub enum StorageError {
 #[async_trait]
 pub trait StorageBackend: Send + Sync {
     async fn upload(&self, filename: &str, data: &[u8]) -> Result<String, StorageError>;
+    async fn upload_to_folder(&self, folder: &str, filename: &str, data: &[u8]) -> Result<String, StorageError>;
     async fn delete(&self, path: &str) -> Result<(), StorageError>;
+    async fn delete_folder(&self, folder: &str) -> Result<(), StorageError>;
     fn public_url(&self, path: &str) -> String;
 }

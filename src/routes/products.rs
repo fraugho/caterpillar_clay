@@ -6,7 +6,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
-use crate::models::Product;
+use crate::models::{Product, ProductImage};
 use crate::routes::AppState;
 
 #[derive(Serialize)]
@@ -16,19 +16,22 @@ pub struct ProductResponse {
     pub description: Option<String>,
     pub price_cents: i32,
     pub price: f64,
-    pub image_url: Option<String>,
+    pub images: Vec<String>,
     pub stock_quantity: i32,
 }
 
 impl ProductResponse {
-    fn from_product(product: Product, state: &AppState) -> Self {
-        let image_url = product.image_path.map(|p| {
-            if p.starts_with("http") {
-                p
-            } else {
-                state.storage.public_url(&p)
-            }
-        });
+    fn from_product(product: Product, images: Vec<ProductImage>, state: &AppState) -> Self {
+        let image_urls: Vec<String> = images
+            .into_iter()
+            .map(|img| {
+                if img.image_path.starts_with("http") {
+                    img.image_path
+                } else {
+                    state.storage.public_url(&img.image_path)
+                }
+            })
+            .collect();
 
         Self {
             id: product.id,
@@ -36,7 +39,7 @@ impl ProductResponse {
             description: product.description,
             price_cents: product.price_cents,
             price: product.price_cents as f64 / 100.0,
-            image_url,
+            images: image_urls,
             stock_quantity: product.stock_quantity,
         }
     }
@@ -52,10 +55,11 @@ async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<Prod
     let conn = state.db.connect().map_err(AppError::from)?;
     let products = Product::list_active(&conn).await?;
 
-    let responses: Vec<ProductResponse> = products
-        .into_iter()
-        .map(|p| ProductResponse::from_product(p, &state))
-        .collect();
+    let mut responses = Vec::new();
+    for product in products {
+        let images = ProductImage::list_by_product(&conn, &product.id).await?;
+        responses.push(ProductResponse::from_product(product, images, &state));
+    }
 
     Ok(Json(responses))
 }
@@ -73,5 +77,7 @@ async fn get_product(
         return Err(AppError::NotFound("Product not found".to_string()));
     }
 
-    Ok(Json(ProductResponse::from_product(product, &state)))
+    let images = ProductImage::list_by_product(&conn, &id).await?;
+
+    Ok(Json(ProductResponse::from_product(product, images, &state)))
 }

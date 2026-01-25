@@ -93,26 +93,44 @@ struct CreateFileRequest {
     name: String,
     mime_type: String,
     size: i64,
-    checksum_sha256_base64: String,
-    upload: FileUploadConfig,
+    checksum_sha256_base64: Option<String>,
+    service: String,
+    upload: FileUploadParts,
 }
 
 #[derive(Debug, Serialize)]
-struct FileUploadConfig {
-    service: String,
-    is_uploaded: bool,
+struct FileUploadParts {
+    parts: Vec<UploadPart>,
+}
+
+#[derive(Debug, Serialize)]
+struct UploadPart {
+    number: i32,
+    chunk_start: i64,
+    chunk_end: i64,
+    checksum_sha256_base64: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct FileResponse {
     id: String,
+    path: String,
     upload: FileUploadInfo,
 }
 
 #[derive(Debug, Deserialize)]
 struct FileUploadInfo {
+    id: String,
+    parts: Vec<UploadPartInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UploadPartInfo {
+    number: i32,
     url: String,
-    headers: std::collections::HashMap<String, String>,
+    chunk_start: i64,
+    chunk_end: i64,
+    headers: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -320,29 +338,35 @@ impl PolarService {
         Ok(())
     }
 
-    /// Upload an image to a Polar product
-    pub async fn upload_product_image(
+    /// Upload an image to Polar and return the file ID
+    pub async fn upload_file(
         &self,
-        product_id: &str,
         filename: &str,
         mime_type: &str,
         data: &[u8],
-    ) -> AppResult<()> {
-        // Step 1: Calculate SHA256 checksum
+    ) -> AppResult<String> {
+        let size = data.len() as i64;
+
+        // Step 1: Calculate SHA256 checksum for the whole file
         let mut hasher = Sha256::new();
         hasher.update(data);
         let checksum = hasher.finalize();
         let checksum_base64 = BASE64.encode(checksum);
 
-        // Step 2: Request upload URL from Polar
+        // Step 2: Request upload URL from Polar (single part for small files)
         let create_request = CreateFileRequest {
             name: filename.to_string(),
             mime_type: mime_type.to_string(),
-            size: data.len() as i64,
-            checksum_sha256_base64: checksum_base64.clone(),
-            upload: FileUploadConfig {
-                service: "product_media".to_string(),
-                is_uploaded: false,
+            size,
+            checksum_sha256_base64: Some(checksum_base64.clone()),
+            service: "product_media".to_string(),
+            upload: FileUploadParts {
+                parts: vec![UploadPart {
+                    number: 1,
+                    chunk_start: 0,
+                    chunk_end: size,
+                    checksum_sha256_base64: Some(checksum_base64.clone()),
+                }],
             },
         };
 
@@ -369,16 +393,21 @@ impl PolarService {
             .await
             .map_err(|e| AppError::ExternalService(format!("Failed to parse file response: {}", e)))?;
 
-        // Step 3: Upload file to S3 with checksum header
+        // Step 3: Upload file to S3 using the part URL
+        let part = file_response.upload.parts.first().ok_or_else(|| {
+            AppError::ExternalService("No upload parts returned".to_string())
+        })?;
+
         let mut upload_request = self
             .client
-            .put(&file_response.upload.url)
-            .header("Content-Type", mime_type)
-            .header("x-amz-checksum-sha256", &checksum_base64);
+            .put(&part.url)
+            .header("Content-Type", mime_type);
 
-        // Add any additional headers from Polar
-        for (key, value) in &file_response.upload.headers {
-            upload_request = upload_request.header(key, value);
+        // Add headers from Polar (includes x-amz-checksum-sha256 if needed)
+        if let Some(headers) = &part.headers {
+            for (key, value) in headers {
+                upload_request = upload_request.header(key, value);
+            }
         }
 
         let upload_response = upload_request
@@ -396,11 +425,44 @@ impl PolarService {
             )));
         }
 
-        // Step 4: Mark file as uploaded
+        // Get ETag from S3 response
+        let etag = upload_response
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_matches('"').to_string())
+            .unwrap_or_default();
+
+        // Step 4: Mark file as uploaded with part ETags
+        #[derive(Serialize)]
+        struct FileUploadedRequest {
+            id: String,
+            path: String,
+            parts: Vec<UploadedPart>,
+        }
+
+        #[derive(Serialize)]
+        struct UploadedPart {
+            number: i32,
+            checksum_etag: String,
+            checksum_sha256_base64: Option<String>,
+        }
+
+        let uploaded_request = FileUploadedRequest {
+            id: file_response.upload.id.clone(),
+            path: file_response.path.clone(),
+            parts: vec![UploadedPart {
+                number: 1,
+                checksum_etag: etag,
+                checksum_sha256_base64: Some(checksum_base64),
+            }],
+        };
+
         let complete_response = self
             .client
             .post(format!("{}/files/{}/uploaded", POLAR_API_URL, file_response.id))
             .header("Authorization", format!("Bearer {}", self.access_token))
+            .json(&uploaded_request)
             .send()
             .await
             .map_err(|e| AppError::ExternalService(format!("Polar file complete error: {}", e)))?;
@@ -414,12 +476,16 @@ impl PolarService {
             )));
         }
 
-        // Step 5: Attach media to product
+        Ok(file_response.id)
+    }
+
+    /// Update product media with file IDs
+    pub async fn set_product_media(&self, product_id: &str, file_ids: Vec<String>) -> AppResult<()> {
         let media_request = UpdateProductMedia {
-            medias: vec![file_response.id],
+            medias: file_ids,
         };
 
-        let product_response = self
+        let response = self
             .client
             .patch(format!("{}/products/{}", POLAR_API_URL, product_id))
             .header("Authorization", format!("Bearer {}", self.access_token))
@@ -428,9 +494,9 @@ impl PolarService {
             .await
             .map_err(|e| AppError::ExternalService(format!("Polar product update error: {}", e)))?;
 
-        if !product_response.status().is_success() {
-            let status = product_response.status();
-            let body = product_response.text().await.unwrap_or_default();
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
             return Err(AppError::ExternalService(format!(
                 "Polar product media update error {}: {}",
                 status, body
@@ -438,5 +504,17 @@ impl PolarService {
         }
 
         Ok(())
+    }
+
+    /// Upload an image to a Polar product (convenience method for single image)
+    pub async fn upload_product_image(
+        &self,
+        product_id: &str,
+        filename: &str,
+        mime_type: &str,
+        data: &[u8],
+    ) -> AppResult<()> {
+        let file_id = self.upload_file(filename, mime_type, data).await?;
+        self.set_product_media(product_id, vec![file_id]).await
     }
 }

@@ -22,6 +22,12 @@ impl LocalStorage {
         fs::create_dir_all(&self.upload_dir).await?;
         Ok(())
     }
+
+    async fn ensure_subdir(&self, subdir: &str) -> Result<PathBuf, StorageError> {
+        let dir = self.upload_dir.join(subdir);
+        fs::create_dir_all(&dir).await?;
+        Ok(dir)
+    }
 }
 
 #[async_trait]
@@ -42,6 +48,22 @@ impl StorageBackend for LocalStorage {
         Ok(format!("/uploads/{}", unique_name))
     }
 
+    async fn upload_to_folder(&self, folder: &str, filename: &str, data: &[u8]) -> Result<String, StorageError> {
+        let dir = self.ensure_subdir(folder).await?;
+
+        let extension = filename
+            .rsplit('.')
+            .next()
+            .unwrap_or("bin");
+
+        let unique_name = format!("{}.{}", Uuid::new_v4(), extension);
+        let file_path = dir.join(&unique_name);
+
+        fs::write(&file_path, data).await?;
+
+        Ok(format!("/uploads/{}/{}", folder, unique_name))
+    }
+
     async fn delete(&self, path: &str) -> Result<(), StorageError> {
         let filename = path.trim_start_matches("/uploads/");
         let file_path = self.upload_dir.join(filename);
@@ -50,6 +72,14 @@ impl StorageBackend for LocalStorage {
             fs::remove_file(&file_path).await?;
         }
 
+        Ok(())
+    }
+
+    async fn delete_folder(&self, folder: &str) -> Result<(), StorageError> {
+        let dir = self.upload_dir.join(folder);
+        if dir.exists() {
+            fs::remove_dir_all(&dir).await?;
+        }
         Ok(())
     }
 

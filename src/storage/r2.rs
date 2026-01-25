@@ -45,6 +45,19 @@ impl R2Storage {
     }
 }
 
+impl R2Storage {
+    fn get_content_type(extension: &str) -> &'static str {
+        match extension.to_lowercase().as_str() {
+            "jpg" | "jpeg" => "image/jpeg",
+            "png" => "image/png",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            _ => "application/octet-stream",
+        }
+    }
+}
+
 #[async_trait]
 impl StorageBackend for R2Storage {
     async fn upload(&self, filename: &str, data: &[u8]) -> Result<String, StorageError> {
@@ -52,14 +65,22 @@ impl StorageBackend for R2Storage {
         let unique_name = format!("{}.{}", Uuid::new_v4(), extension);
         let path = format!("uploads/{}", unique_name);
 
-        let content_type = match extension.to_lowercase().as_str() {
-            "jpg" | "jpeg" => "image/jpeg",
-            "png" => "image/png",
-            "gif" => "image/gif",
-            "webp" => "image/webp",
-            "svg" => "image/svg+xml",
-            _ => "application/octet-stream",
-        };
+        let content_type = Self::get_content_type(extension);
+
+        self.bucket
+            .put_object_with_content_type(&path, data, content_type)
+            .await
+            .map_err(|e| StorageError::UploadFailed(e.to_string()))?;
+
+        Ok(format!("/{}", path))
+    }
+
+    async fn upload_to_folder(&self, folder: &str, filename: &str, data: &[u8]) -> Result<String, StorageError> {
+        let extension = filename.rsplit('.').next().unwrap_or("bin");
+        let unique_name = format!("{}.{}", Uuid::new_v4(), extension);
+        let path = format!("uploads/{}/{}", folder, unique_name);
+
+        let content_type = Self::get_content_type(extension);
 
         self.bucket
             .put_object_with_content_type(&path, data, content_type)
@@ -76,6 +97,27 @@ impl StorageBackend for R2Storage {
             .delete_object(path)
             .await
             .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn delete_folder(&self, folder: &str) -> Result<(), StorageError> {
+        // R2/S3 doesn't have real folders, so we need to list and delete all objects with the prefix
+        let prefix = format!("uploads/{}/", folder);
+        let results = self
+            .bucket
+            .list(prefix.clone(), None)
+            .await
+            .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
+
+        for result in results {
+            for object in result.contents {
+                self.bucket
+                    .delete_object(&object.key)
+                    .await
+                    .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
+            }
+        }
 
         Ok(())
     }
