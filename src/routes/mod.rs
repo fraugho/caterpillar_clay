@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod auth;
 pub mod cart;
+pub mod newsletter;
 pub mod orders;
 pub mod products;
 pub mod settings;
@@ -16,7 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
 use crate::middleware::auth::auth_middleware;
-use crate::services::{ClerkService, EasyPostService, EmailService, PolarService};
+use crate::services::{ClerkService, EasyPostService, EmailService, PolarService, ResendService};
 use crate::storage::StorageBackend;
 
 #[derive(Clone)]
@@ -27,6 +28,7 @@ pub struct AppState {
     pub polar: PolarService,
     pub easypost: EasyPostService,
     pub email: Option<EmailService>,
+    pub resend: Option<ResendService>,
     pub storage: Arc<dyn StorageBackend>,
 }
 
@@ -35,7 +37,8 @@ pub fn create_router(state: AppState) -> Router {
         .merge(products::public_routes())
         .merge(auth::routes())
         .merge(webhooks::routes())
-        .merge(settings::routes());
+        .merge(settings::routes())
+        .merge(newsletter::routes());
 
     let protected_routes = Router::new()
         .merge(orders::routes())

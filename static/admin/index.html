@@ -162,6 +162,10 @@
                         <div class="stat-value" x-text="dashboard.total_products || 0"></div>
                         <div class="stat-label">PRODUCTS</div>
                     </div>
+                    <div class="stat">
+                        <div class="stat-value" x-text="subscriberCount"></div>
+                        <div class="stat-label">SUBSCRIBERS</div>
+                    </div>
                 </div>
 
                 <template x-if="dashboard.low_stock_products && dashboard.low_stock_products.length">
@@ -243,6 +247,7 @@
                             </div>
                             <div class="product-actions">
                                 <button class="btn" @click="editProduct(p)">EDIT</button>
+                                <button class="btn btn-success" @click="notifySubscribers(p.id)" :disabled="p.notifying" x-text="p.notifying ? '...' : 'NOTIFY'"></button>
                                 <button class="btn btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
                         </div>
@@ -512,6 +517,7 @@
                 dragOverIdx: null,
                 artistSettings: { image: '', description: '', imagePreview: null, newImageFile: null },
                 savingArtist: false,
+                subscriberCount: 0,
 
                 async init() {
                     // Load data for saved tab
@@ -523,6 +529,7 @@
                         await this.loadArtistSettings();
                     } else {
                         await this.loadDashboard();
+                        await this.loadSubscriberCount();
                     }
 
                     // Watch for tab changes and save to localStorage
@@ -537,6 +544,39 @@
                         this.dashboard = await res.json();
                     } catch (e) {
                         console.error('Failed to load dashboard:', e);
+                    }
+                },
+
+                async loadSubscriberCount() {
+                    try {
+                        const res = await fetch('/admin/api/newsletter/subscribers');
+                        const data = await res.json();
+                        this.subscriberCount = data.count || 0;
+                    } catch (e) {
+                        console.error('Failed to load subscriber count:', e);
+                    }
+                },
+
+                async notifySubscribers(productId) {
+                    const product = this.products.find(p => p.id === productId);
+                    if (!product) return;
+
+                    if (!confirm(`Send new product notification to ${this.subscriberCount} subscribers?`)) return;
+
+                    product.notifying = true;
+                    try {
+                        const res = await fetch(`/admin/api/newsletter/notify/${productId}`, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Sent notifications to ${data.sent_count} of ${data.total_subscribers} subscribers`);
+                        } else {
+                            alert('Failed to send notifications');
+                        }
+                    } catch (e) {
+                        console.error('Failed to notify subscribers:', e);
+                        alert('Failed to send notifications: ' + e.message);
+                    } finally {
+                        product.notifying = false;
                     }
                 },
 

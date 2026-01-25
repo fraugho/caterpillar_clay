@@ -24,3 +24,4 @@ lettre = { version = "0.11.19", features = ["tokio1-native-tls"] }
 rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustls-tls"] }
 sha2 = "0.10"
 base64 = "0.22"
+resend-rs = "0.8"

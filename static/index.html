@@ -391,6 +391,21 @@
         </template>
     </main>
 
+    <!-- Newsletter Signup -->
+    <footer x-cloak x-show="!initializing && page === 'home' && !selectedProduct" style="background:var(--bg-card);border-top:2px solid var(--border);padding:40px 20px;margin-top:40px;position:relative;z-index:1">
+        <div style="max-width:500px;margin:0 auto;text-align:center">
+            <h3 style="font-size:12px;color:var(--accent);margin-bottom:16px">STAY IN THE LOOP</h3>
+            <p style="font-size:8px;color:var(--text-secondary);margin-bottom:20px;line-height:2">Get notified when we add new handmade pottery pieces</p>
+            <form @submit.prevent="subscribeNewsletter()" style="display:flex;gap:12px;max-width:400px;margin:0 auto">
+                <input type="email" x-model="newsletterEmail" placeholder="your@email.com" style="flex:1;margin-bottom:0" required>
+                <button type="submit" class="btn" style="width:auto;padding:12px 20px" :disabled="subscribing">
+                    <span x-text="subscribing ? '...' : 'SUBSCRIBE'"></span>
+                </button>
+            </form>
+            <p x-show="newsletterMessage" x-text="newsletterMessage" style="font-size:8px;margin-top:12px" :style="{ color: newsletterSuccess ? '#22c55e' : '#ef4444' }"></p>
+        </div>
+    </footer>
+
     <script>
         function shop(){
             return{
@@ -404,6 +419,10 @@
                 initializing:true,
                 loadingProducts:true,
                 loadingOrders:false,
+                newsletterEmail:'',
+                subscribing:false,
+                newsletterMessage:'',
+                newsletterSuccess:false,
                 processingOrder:false,
                 orderMessage:'',
                 selectedProduct:null,
@@ -580,6 +599,28 @@
                         this.orders = [];
                         this.showUserMenu = false;
                         this.page = 'home';
+                    }
+                },
+
+                async subscribeNewsletter(){
+                    if(!this.newsletterEmail) return;
+                    this.subscribing = true;
+                    this.newsletterMessage = '';
+                    try {
+                        const res = await fetch('/api/newsletter/subscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: this.newsletterEmail })
+                        });
+                        const data = await res.json();
+                        this.newsletterSuccess = data.success;
+                        this.newsletterMessage = data.message;
+                        if(data.success) this.newsletterEmail = '';
+                    } catch(e) {
+                        this.newsletterSuccess = false;
+                        this.newsletterMessage = 'Something went wrong. Please try again.';
+                    } finally {
+                        this.subscribing = false;
                     }
                 },
 

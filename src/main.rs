@@ -13,7 +13,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::Config;
 use crate::routes::{create_router, AppState};
-use crate::services::{ClerkService, EasyPostService, EmailService, PolarService};
+use crate::services::{ClerkService, EasyPostService, EmailService, PolarService, ResendService};
 use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
@@ -61,6 +61,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // Initialize Resend service for newsletters
+    let resend = config.resend_api_key.as_ref().map(|api_key| {
+        tracing::info!("Resend newsletter service initialized");
+        ResendService::new(api_key, &config.from_email, &config.base_url)
+    });
+
     // Initialize storage
     let storage: Arc<dyn StorageBackend> = if config.storage_type == "r2" {
         match (&config.r2_bucket, &config.r2_account_id, &config.r2_access_key, &config.r2_secret_key, &config.r2_public_url) {
@@ -91,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         polar,
         easypost,
         email,
+        resend,
         storage,
     };
 

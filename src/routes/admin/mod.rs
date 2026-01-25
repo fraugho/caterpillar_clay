@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod newsletter;
 pub mod orders;
 pub mod products;
 pub mod settings;
@@ -19,12 +20,14 @@ pub fn routes(db: Arc<Database>, testing_mode: bool) -> Router<AppState> {
             .merge(orders::routes())
             .merge(dashboard::routes())
             .merge(settings::routes())
+            .merge(newsletter::routes())
     } else {
         Router::new()
             .merge(products::routes())
             .merge(orders::routes())
             .merge(dashboard::routes())
             .merge(settings::routes())
+            .merge(newsletter::routes())
             .layer(middleware::from_fn_with_state(db.clone(), require_admin))
             .layer(middleware::from_fn_with_state(db, auth_middleware))
     };

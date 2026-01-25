@@ -18,6 +18,7 @@ Recent changes to get you up to speed:
 | **Artist page** | `/artist.html` shows artist bio and image, fetched from `site_settings`. |
 | **Admin artist settings** | Admin panel ARTIST tab lets you update artist photo and bio. |
 | **Centered header** | Logo centered, ARTIST on left, CART/account on right. |
+| **Newsletter** | Visitors can subscribe to get notified when new products are added. Uses Resend. |
 
 ### Key Files to Know
 
@@ -28,7 +29,10 @@ Recent changes to get you up to speed:
 | `static/admin/index.html` | Admin panel SPA |
 | `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
 | `src/routes/admin/settings.rs` | Admin artist settings API |
+| `src/routes/newsletter.rs` | Newsletter subscribe/unsubscribe API |
+| `src/services/resend.rs` | Resend email service for newsletters |
 | `src/models/settings.rs` | Site settings model (artist info) |
+| `src/models/newsletter.rs` | Newsletter subscriber model |
 | `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
@@ -106,7 +110,8 @@ clay/
 │   ├── 007_add_polar_product_id.sql
 │   ├── 008_unix_timestamps.sql
 │   ├── 009_product_images.sql
-│   └── 010_site_settings.sql
+│   ├── 010_site_settings.sql
+│   └── 011_newsletter_subscribers.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -182,6 +187,9 @@ SMTP_HOST=smtp.resend.com
 SMTP_USER=resend
 SMTP_PASS=re_xxxxx
 FROM_EMAIL=orders@yourdomain.com
+
+# For newsletter (get from resend.com)
+RESEND_API_KEY=re_xxxxx
 
 # Storage (local or r2)
 STORAGE_TYPE=local
@@ -278,6 +286,14 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | value | TEXT | Setting value |
 | updated_ts | INTEGER | Unix timestamp |
 
+### newsletter_subscribers
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| email | TEXT UNIQUE | Subscriber email |
+| subscribed_ts | INTEGER | Unix timestamp |
+| unsubscribe_token | TEXT UNIQUE | Token for unsubscribe link |
+
 ### 3. Build and Run
 
 ```bash
@@ -340,6 +356,8 @@ curl -X POST http://localhost:3000/admin/api/products \
 | GET | `/api/products` | List active products |
 | GET | `/api/products/:id` | Get single product |
 | GET | `/api/artist` | Get artist info (image, description) |
+| POST | `/api/newsletter/subscribe` | Subscribe to newsletter |
+| GET | `/api/newsletter/unsubscribe?token=` | Unsubscribe from newsletter |
 
 ### Authenticated (Customer)
 | Method | Endpoint | Description |
@@ -367,6 +385,8 @@ curl -X POST http://localhost:3000/admin/api/products \
 | GET | `/admin/settings/artist` | Get artist info |
 | PUT | `/admin/settings/artist` | Update artist description |
 | PUT | `/admin/settings/artist/image` | Upload artist image |
+| GET | `/admin/newsletter/subscribers` | Get subscriber count |
+| POST | `/admin/newsletter/notify/:product_id` | Send new product notification to all subscribers |
 
 ### Webhooks
 | Method | Endpoint | Description |

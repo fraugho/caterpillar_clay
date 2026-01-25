@@ -13,6 +13,7 @@ pub struct Config {
     pub smtp_user: String,
     pub smtp_pass: String,
     pub from_email: String,
+    pub resend_api_key: Option<String>,
     pub storage_type: String,
     pub upload_dir: String,
     pub r2_bucket: Option<String>,
@@ -40,6 +41,7 @@ impl Config {
             smtp_pass: env::var("SMTP_PASS")?,
             from_email: env::var("FROM_EMAIL")
                 .unwrap_or_else(|_| "orders@caterpillarclay.com".to_string()),
+            resend_api_key: env::var("RESEND_API_KEY").ok(),
             storage_type: env::var("STORAGE_TYPE").unwrap_or_else(|_| "local".to_string()),
             upload_dir: env::var("UPLOAD_DIR").unwrap_or_else(|_| "./static/uploads".to_string()),
             r2_bucket: env::var("R2_BUCKET").ok(),
