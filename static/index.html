@@ -63,10 +63,10 @@
         .auth-btn{background:transparent;border:2px solid #fff;color:#fff;padding:8px 12px;font-family:inherit;font-size:8px;cursor:none;border-radius:6px;width:auto}
         .auth-btn:hover{background:rgba(255,255,255,0.1)}
         .user-menu{position:relative}
-        .user-dropdown{display:none;position:absolute;right:0;top:100%;background:var(--accent);padding:8px;min-width:150px;z-index:100;border-radius:8px;margin-top:8px}
+        .user-dropdown{display:none;position:absolute;right:0;top:100%;background:#5a8ab5;padding:8px;min-width:150px;z-index:100;border-radius:8px;margin-top:8px}
         .user-dropdown.show{display:block}
         .user-dropdown a{display:block;color:#fff;text-decoration:none;padding:8px;font-size:8px;border-radius:4px}
-        .user-dropdown a:hover{background:var(--accent-hover)}
+        .user-dropdown a:hover{background:#4a7a9f}
         .detail-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg-primary);z-index:1000;overflow-y:auto;padding:80px 20px 20px 20px}
         .detail-overlay .stars{position:absolute;inset:0;z-index:0;pointer-events:none}
         .detail-overlay .detail-content{position:relative;z-index:1;display:block}
@@ -193,7 +193,7 @@
                     <div class="user-menu">
                         <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user.firstName || 'Account'"></button>
                         <div class="user-dropdown" :class="{ show: showUserMenu }">
-                            <a href="#" @click.prevent="navigateToPage('orders'); showUserMenu=false">My Orders</a>
+                            <a href="/account.html">Account Settings</a>
                             <template x-if="user.isAdmin">
                                 <a href="/admin/">Admin Panel</a>
                             </template>

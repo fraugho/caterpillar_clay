@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings - Caterpillar Clay</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Clerk -->
+    <script async crossorigin="anonymous" data-clerk-publishable-key="pk_test_Y2FyaW5nLWpheWJpcmQtODYuY2xlcmsuYWNjb3VudHMuZGV2JA" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+    <style>
+        :root{
+            --bg-primary:#F8F8F8;
+            --bg-secondary:#FFFFFF;
+            --bg-card:#FFFFFF;
+            --text-primary:#18191B;
+            --text-secondary:#666666;
+            --accent:#97BAD9;
+            --accent-hover:#7BA3C9;
+            --border:#E0E0E0;
+        }
+        @media(prefers-color-scheme:dark){
+            :root{
+                --bg-primary:#18191B;
+                --bg-secondary:#1E2022;
+                --bg-card:#252729;
+                --text-primary:#F8F8F8;
+                --text-secondary:#A0A0A0;
+                --accent:#97BAD9;
+                --accent-hover:#AECCE8;
+                --border:#333537;
+            }
+        }
+        *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
+        body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;display:flex;flex-direction:column}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+        .star{position:absolute;background:var(--accent);opacity:0.4}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
+        nav{background:var(--accent);padding:20px;position:relative;z-index:10}
+        nav a{color:#fff;text-decoration:none;font-size:12px}
+        .container{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;position:relative;z-index:10}
+        .account-card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px;max-width:800px;width:100%}
+        #clerk-profile{display:flex;justify-content:center}
+
+        /* Override Clerk styles to match theme */
+        .cl-rootBox{
+            --clerk-font-family:'Press Start 2P',cursive;
+            width:100% !important;
+        }
+        .cl-card{
+            background:var(--bg-card) !important;
+            border:none !important;
+            box-shadow:none !important;
+        }
+        .cl-headerTitle{
+            font-family:'Press Start 2P',cursive !important;
+            color:var(--text-primary) !important;
+            font-size:12px !important;
+        }
+        .cl-headerSubtitle{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+            color:var(--text-secondary) !important;
+        }
+        .cl-formButtonPrimary{
+            background:var(--accent) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+            border-radius:8px !important;
+        }
+        .cl-formButtonPrimary:hover{
+            background:var(--accent-hover) !important;
+        }
+        .cl-formFieldInput{
+            background:var(--bg-secondary) !important;
+            border:2px solid var(--border) !important;
+            color:var(--text-primary) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+        }
+        .cl-formFieldLabel{
+            color:var(--text-primary) !important;
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+        }
+        .cl-profileSectionTitle{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:10px !important;
+            color:var(--text-primary) !important;
+        }
+        .cl-profileSectionContent{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+        }
+        .cl-userButtonPopoverActionButton{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+        }
+        .cl-navbar{
+            background:var(--bg-secondary) !important;
+            border-right:2px solid var(--border) !important;
+        }
+        .cl-navbarButton{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+            color:var(--text-primary) !important;
+        }
+        .cl-navbarButton:hover, .cl-navbarButton[data-active="true"]{
+            background:var(--accent) !important;
+            color:#18191B !important;
+        }
+        .cl-pageScrollBox{
+            background:var(--bg-card) !important;
+        }
+        .cl-profilePage{
+            background:var(--bg-card) !important;
+        }
+        .cl-accordionTriggerButton{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+        }
+        .cl-formButtonReset{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:8px !important;
+            color:var(--accent) !important;
+        }
+        .cl-badge{
+            font-family:'Press Start 2P',cursive !important;
+            font-size:6px !important;
+            background:#22c55e !important;
+            color:#fff !important;
+            padding:4px 8px !important;
+            border-radius:4px !important;
+        }
+        .cl-badge[data-localization-key*="primary"],
+        .cl-badge__primary{
+            background:#22c55e !important;
+            color:#fff !important;
+        }
+        .cl-badge[data-localization-key*="thisDevice"],
+        .cl-badge__thisDevice{
+            background:#8b5cf6 !important;
+            color:#fff !important;
+        }
+        /* Make section items more visible */
+        .cl-profileSectionItem,
+        .cl-activeDeviceListItem,
+        .cl-activeDevice{
+            background:var(--bg-secondary) !important;
+            border:2px solid var(--border) !important;
+            border-radius:8px !important;
+            padding:12px !important;
+            margin-bottom:8px !important;
+        }
+        .cl-profileSectionItemList{
+            gap:8px !important;
+        }
+        .cl-profileSectionContent__emailAddresses,
+        .cl-profileSectionContent__activeDevices{
+            background:transparent !important;
+        }
+        .cl-userPreview,
+        .cl-deviceInfo{
+            color:var(--text-primary) !important;
+        }
+        .cl-userPreviewSecondaryIdentifier,
+        .cl-activeDeviceLabel{
+            color:var(--text-secondary) !important;
+        }
+        /* Hide Clerk's built-in delete account section */
+        .cl-profileSection__danger,
+        .cl-profileSection__deleteAccount,
+        [data-localization-key="userProfile.start.dangerSection.title"],
+        .cl-profileSectionPrimaryButton__danger{
+            display:none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <nav>
+        <div style="max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center">
+            <a href="/">CATERPILLAR CLAY</a>
+            <a href="/" style="font-size:10px">Back to Shop</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="account-card">
+            <div id="clerk-profile"></div>
+
+            <!-- Custom Delete Account Section -->
+            <div id="delete-section" style="display:none;margin-top:32px;padding-top:32px;border-top:2px solid var(--border)">
+                <h3 style="font-size:12px;margin-bottom:16px;color:#dc2626">Delete Account</h3>
+                <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px;line-height:1.8">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+                <button id="delete-btn" style="background:#dc2626;color:#fff;padding:14px 20px;font-family:inherit;font-size:8px;border:none;cursor:pointer;border-radius:8px">
+                    DELETE MY ACCOUNT
+                </button>
+            </div>
+
+            <!-- Confirmation Modal -->
+            <div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+                <div style="background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:32px;max-width:400px;text-align:center">
+                    <h3 style="font-size:12px;margin-bottom:16px;color:#dc2626">Are you sure?</h3>
+                    <p style="font-size:8px;color:var(--text-secondary);margin-bottom:24px;line-height:1.8">
+                        This will permanently delete your account, order history, and all data. This cannot be undone.
+                    </p>
+                    <div style="display:flex;gap:12px;justify-content:center">
+                        <button id="cancel-btn" style="background:var(--accent);color:#18191B;padding:14px 20px;font-family:inherit;font-size:8px;border:none;cursor:pointer;border-radius:8px">
+                            CANCEL
+                        </button>
+                        <button id="confirm-delete-btn" style="background:#dc2626;color:#fff;padding:14px 20px;font-family:inherit;font-size:8px;border:none;cursor:pointer;border-radius:8px">
+                            YES, DELETE
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generate pixel stars
+        (function generateStars(){
+            const container=document.getElementById('stars');
+            const sizes=[2,3,4,6,8];
+            for(let i=0;i<60;i++){
+                const star=document.createElement('div');
+                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                const size=sizes[Math.floor(Math.random()*sizes.length)];
+                star.style.width=size+'px';
+                star.style.height=size+'px';
+                star.style.left=Math.random()*100+'%';
+                star.style.top=Math.random()*100+'%';
+                star.style.animationDelay=Math.random()*2+'s';
+                container.appendChild(star);
+            }
+        })();
+
+        // Initialize Clerk user profile
+        window.addEventListener('load', async () => {
+            try {
+                await window.Clerk.load();
+
+                // If not signed in, redirect to login
+                if (!window.Clerk.user) {
+                    window.location.href = '/login.html?redirect=/account.html';
+                    return;
+                }
+
+                const profileDiv = document.getElementById('clerk-profile');
+                const styles = getComputedStyle(document.documentElement);
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+                window.Clerk.mountUserProfile(profileDiv, {
+                    appearance: {
+                        variables: {
+                            colorPrimary: '#97BAD9',
+                            colorDanger: '#dc2626',
+                            colorText: styles.getPropertyValue('--text-primary').trim(),
+                            colorTextSecondary: styles.getPropertyValue('--text-secondary').trim(),
+                            colorBackground: styles.getPropertyValue('--bg-card').trim(),
+                            colorInputBackground: styles.getPropertyValue('--bg-secondary').trim(),
+                            colorInputText: styles.getPropertyValue('--text-primary').trim(),
+                            borderRadius: '8px',
+                        },
+                        elements: {
+                            card: {
+                                backgroundColor: isDark ? '#252729' : '#FFFFFF',
+                                border: 'none',
+                                boxShadow: 'none'
+                            },
+                            navbar: {
+                                backgroundColor: isDark ? '#1E2022' : '#FFFFFF',
+                                borderRight: '2px solid ' + (isDark ? '#333537' : '#E0E0E0')
+                            },
+                            navbarButton: {
+                                '&:hover': { backgroundColor: '#97BAD9', color: '#18191B' },
+                                '&[data-active="true"]': { backgroundColor: '#97BAD9', color: '#18191B' }
+                            }
+                        }
+                    }
+                });
+
+                // Show delete section
+                document.getElementById('delete-section').style.display = 'block';
+
+                // Delete account handlers
+                const modal = document.getElementById('confirm-modal');
+
+                document.getElementById('delete-btn').addEventListener('click', () => {
+                    modal.style.display = 'flex';
+                });
+
+                document.getElementById('cancel-btn').addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+
+                document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+                    try {
+                        document.getElementById('confirm-delete-btn').textContent = 'DELETING...';
+                        document.getElementById('confirm-delete-btn').disabled = true;
+
+                        await window.Clerk.user.delete();
+                        window.location.href = '/?deleted=1';
+                    } catch(e) {
+                        console.error('Failed to delete account:', e);
+                        alert('Failed to delete account. Please try again.');
+                        modal.style.display = 'none';
+                        document.getElementById('confirm-delete-btn').textContent = 'YES, DELETE';
+                        document.getElementById('confirm-delete-btn').disabled = false;
+                    }
+                });
+
+            } catch(e) {
+                console.error('Failed to load Clerk:', e);
+                document.getElementById('clerk-profile').innerHTML = '<p style="color:var(--text-secondary);font-size:8px">Account service unavailable</p>';
+            }
+        });
+    </script>
+</body>
+</html>
