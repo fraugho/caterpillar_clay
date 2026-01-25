@@ -2,6 +2,31 @@
 
 A full-stack e-commerce application for a pottery shop built with Rust (Axum) backend and HTMX/Alpine.js frontend.
 
+## Quick Ramp-Up
+
+Recent changes to get you up to speed:
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-image products** | Products support multiple images with drag-to-reorder. Stored in `product_images` table. |
+| **Image carousels** | Storefront shows image carousels on product cards and detail pages. |
+| **Polar.sh auto-sync** | Creating/updating/deleting products or images auto-syncs to Polar.sh. |
+| **Cart persistence** | Cart saves to localStorage, persists across tabs/refreshes. |
+| **SPA routing** | Direct URLs work (e.g., `/product/{id}`, `/cart`, `/orders`). |
+| **Unix timestamps** | All `created_ts`/`updated_ts` fields are integers (Unix epoch seconds). |
+| **R2 storage** | Product images stored in Cloudflare R2 with public URLs. |
+
+### Key Files to Know
+
+| File | Purpose |
+|------|---------|
+| `static/index.html` | Main storefront SPA (Alpine.js) |
+| `static/admin/index.html` | Admin panel SPA |
+| `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
+| `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
+| `src/models/product.rs` | Product and ProductImage models |
+| `src/storage/r2.rs` | Cloudflare R2 storage backend |
+
 ## TODO - Cloud Service Setup
 
 | Service | Task | Link/Notes |
@@ -73,7 +98,8 @@ clay/
 │   ├── 005_seed_products.sql
 │   ├── 006_add_polar_price_id.sql
 │   ├── 007_add_polar_product_id.sql
-│   └── 008_unix_timestamps.sql
+│   ├── 008_unix_timestamps.sql
+│   └── 009_product_images.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -178,6 +204,66 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 
 **Note:** Timestamps are stored as Unix epoch integers (`i64`) for efficiency. The `created_ts` and `updated_ts` fields use seconds since 1970-01-01.
 
+## Database Schema
+
+### users
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| clerk_id | TEXT UNIQUE | Clerk user ID |
+| email | TEXT | User email |
+| name | TEXT | Display name |
+| is_admin | INTEGER | 1 = admin access |
+| created_at | TEXT | ISO timestamp |
+| updated_at | TEXT | ISO timestamp |
+
+### products
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| name | TEXT | Product name |
+| description | TEXT | Product description |
+| price_cents | INTEGER | Price in cents (e.g., 2400 = $24.00) |
+| image_path | TEXT | Legacy single image (use product_images instead) |
+| stock_quantity | INTEGER | Available stock |
+| is_active | INTEGER | 1 = visible in storefront |
+| polar_product_id | TEXT | Polar.sh product ID |
+| polar_price_id | TEXT | Polar.sh price ID |
+| created_ts | INTEGER | Unix timestamp |
+| updated_ts | INTEGER | Unix timestamp |
+
+### product_images
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| product_id | TEXT FK | References products(id) |
+| image_path | TEXT | R2 storage path or URL |
+| sort_order | INTEGER | Display order (0 = first) |
+| created_ts | INTEGER | Unix timestamp |
+
+### orders
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| user_id | TEXT FK | References users(id) |
+| status | TEXT | pending/paid/shipped/delivered |
+| total_cents | INTEGER | Order total in cents |
+| shipping_address | TEXT | JSON address object |
+| tracking_number | TEXT | Shipping tracking number |
+| easypost_tracker_id | TEXT | EasyPost tracker ID |
+| polar_checkout_id | TEXT | Polar.sh checkout ID |
+| created_ts | INTEGER | Unix timestamp |
+| updated_ts | INTEGER | Unix timestamp |
+
+### order_items
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| order_id | TEXT FK | References orders(id) |
+| product_id | TEXT FK | References products(id) |
+| quantity | INTEGER | Item quantity |
+| price_cents | INTEGER | Price at time of purchase |
+
 ### 3. Build and Run
 
 ```bash
@@ -250,15 +336,19 @@ curl -X POST http://localhost:3000/admin/api/products \
 ### Admin
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/admin/api/dashboard` | Stats overview |
-| GET | `/admin/api/products` | All products |
-| POST | `/admin/api/products` | Create product |
-| PUT | `/admin/api/products/:id` | Update product |
-| DELETE | `/admin/api/products/:id` | Delete product |
-| POST | `/admin/api/products/:id/image` | Upload image |
-| GET | `/admin/api/orders` | All orders |
-| PUT | `/admin/api/orders/:id/status` | Update status |
-| POST | `/admin/api/orders/:id/tracking` | Add tracking |
+| GET | `/admin/products` | All products with images |
+| POST | `/admin/products` | Create product (auto-syncs to Polar) |
+| GET | `/admin/products/:id` | Get single product |
+| PUT | `/admin/products/:id` | Update product (auto-syncs to Polar) |
+| DELETE | `/admin/products/:id` | Delete product (archives in Polar) |
+| POST | `/admin/products/:id/images` | Upload images (multipart, auto-syncs) |
+| PUT | `/admin/products/:id/images/reorder` | Reorder images |
+| DELETE | `/admin/products/:id/images/:image_id` | Delete image |
+| POST | `/admin/products/:id/sync-polar` | Manual Polar sync |
+| GET | `/admin/orders` | All orders |
+| PUT | `/admin/orders/:id/status` | Update status |
+| POST | `/admin/orders/:id/tracking` | Add tracking |
+| GET | `/admin/dashboard` | Stats overview |
 
 ### Webhooks
 | Method | Endpoint | Description |
