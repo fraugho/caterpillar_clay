@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Meet the Artist - Caterpillar Clay</title>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script async crossorigin="anonymous" data-clerk-publishable-key="pk_test_Y2FyaW5nLWpheWJpcmQtODYuY2xlcmsuYWNjb3VudHMuZGV2JA" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+    <style>
+        :root{
+            --bg-primary:#F8F8F8;
+            --bg-secondary:#FFFFFF;
+            --bg-card:#FFFFFF;
+            --text-primary:#18191B;
+            --text-secondary:#666666;
+            --accent:#97BAD9;
+            --accent-hover:#7BA3C9;
+            --border:#E0E0E0;
+        }
+        @media(prefers-color-scheme:dark){
+            :root{
+                --bg-primary:#18191B;
+                --bg-secondary:#1E2022;
+                --bg-card:#252729;
+                --text-primary:#F8F8F8;
+                --text-secondary:#A0A0A0;
+                --accent:#97BAD9;
+                --accent-hover:#AECCE8;
+                --border:#333537;
+            }
+        }
+        *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
+        body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+        .star{position:absolute;background:#97BAD9;opacity:0.4}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
+        nav a{color:#fff;text-decoration:none}
+        .auth-btn{background:transparent;border:2px solid #fff;color:#fff;padding:8px 12px;font-family:inherit;font-size:8px;cursor:none;border-radius:6px;width:auto}
+        .auth-btn:hover{background:rgba(255,255,255,0.1)}
+        .user-menu{position:relative}
+        .user-dropdown{display:none;position:absolute;right:0;top:100%;background:#5a8ab5;padding:8px;min-width:150px;z-index:100;border-radius:8px;margin-top:8px}
+        .user-dropdown.show{display:block}
+        .user-dropdown a{display:block;color:#fff;text-decoration:none;padding:8px;font-size:8px;border-radius:4px}
+        .user-dropdown a:hover{background:#4a7a9f}
+        [x-cloak]{display:none !important}
+        .container{max-width:900px;margin:40px auto;padding:0 20px;position:relative;z-index:10}
+        .card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px}
+        .artist-img{width:100%;max-width:400px;border-radius:12px;border:2px solid var(--border);margin-bottom:32px}
+        .description{font-size:10px;line-height:2.2;color:var(--text-secondary)}
+    </style>
+</head>
+<body x-data="artistPage()">
+    <div class="stars" id="stars"></div>
+
+    <nav x-cloak x-show="!initializing" style="background:#97BAD9;padding:20px;position:relative;z-index:1001">
+        <div style="max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
+            <a href="/" style="font-size:12px;color:#fff;text-decoration:none;cursor:none">CATERPILLAR CLAY</a>
+            <div style="display:flex;gap:24px;font-size:10px;align-items:center">
+                <a href="/artist.html" style="color:#fff;text-decoration:none">ARTIST</a>
+                <a href="/" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount"></span>)</a>
+                <template x-if="user">
+                    <a href="/" style="color:#fff;text-decoration:none">MY ORDERS</a>
+                </template>
+                <template x-if="!user">
+                    <button class="auth-btn" @click="signIn()">SIGN IN</button>
+                </template>
+                <template x-if="user">
+                    <div class="user-menu">
+                        <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user.firstName || 'Account'"></button>
+                        <div class="user-dropdown" :class="{ show: showUserMenu }">
+                            <a href="/account.html">Account Settings</a>
+                            <template x-if="user.publicMetadata && user.publicMetadata.isAdmin">
+                                <a href="/admin/">Admin Panel</a>
+                            </template>
+                            <a href="#" @click.prevent="signOut()">Sign Out</a>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card" style="text-align:center">
+            <h1 style="font-size:16px;margin-bottom:32px;color:#97BAD9">Meet the Artist</h1>
+
+            <img src="/artist/Alex.webp" alt="The Artist" class="artist-img">
+
+            <div style="background:#97BAD9;border-radius:12px;padding:24px;max-width:600px;margin:0 auto">
+                <p style="font-size:10px;line-height:2.2;color:#18191B">
+                    I am currently a college student who started on the pottery wheel 10 years ago as a second grader. Since then I have kept with pottery, and I now enjoy making dinnerware and other vessels. I primarily work with blue underglaze or cobalt slip at cone 6, hand painted or slip-trailed. My pieces go through 3 firings to ensure image clarity, and are inspired by flowers I see in the local area!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function artistPage() {
+            return {
+                cart: [],
+                user: null,
+                showUserMenu: false,
+                initializing: true,
+
+                get cartItemCount() {
+                    return this.cart.reduce((a, b) => a + (b.quantity || 1), 0);
+                },
+
+                async init() {
+                    // Load cart from localStorage
+                    const savedCart = localStorage.getItem('cart');
+                    if (savedCart) {
+                        try {
+                            this.cart = JSON.parse(savedCart);
+                        } catch(e) {
+                            this.cart = [];
+                        }
+                    }
+                    await this.initClerk();
+                    this.initializing = false;
+                },
+
+                async initClerk() {
+                    try {
+                        await window.Clerk.load();
+                        this.user = window.Clerk.user;
+                        window.Clerk.addListener(({user}) => {
+                            this.user = user;
+                        });
+                    } catch(e) {
+                        console.log('Clerk not configured');
+                    }
+                },
+
+                signIn() {
+                    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+                },
+
+                async signOut() {
+                    if (window.Clerk) {
+                        await window.Clerk.signOut();
+                        this.user = null;
+                        this.showUserMenu = false;
+                    }
+                }
+            }
+        }
+
+        // Generate pixel stars
+        (function generateStars(){
+            const container=document.getElementById('stars');
+            const sizes=[2,3,4,6,8];
+            for(let i=0;i<60;i++){
+                const star=document.createElement('div');
+                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                const size=sizes[Math.floor(Math.random()*sizes.length)];
+                star.style.width=size+'px';
+                star.style.height=size+'px';
+                star.style.left=Math.random()*100+'%';
+                star.style.top=Math.random()*100+'%';
+                star.style.animationDelay=Math.random()*2+'s';
+                container.appendChild(star);
+            }
+        })();
+    </script>
+</body>
+</html>
