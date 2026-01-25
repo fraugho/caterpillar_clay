@@ -18,7 +18,7 @@ Recent changes to get you up to speed:
 | **Artist page** | `/artist.html` shows artist bio and image, fetched from `site_settings`. |
 | **Admin artist settings** | Admin panel ARTIST tab lets you update artist photo and bio. |
 | **Centered header** | Logo centered, ARTIST on left, CART/account on right. |
-| **Newsletter** | Visitors can subscribe. Admin can send "New Product" or "Back in Stock" emails via buttons on product cards. Uses Resend. |
+| **Newsletter** | Visitors can subscribe. Admin NOTIFY tab to select multiple products and send combined "New Products" or "In Stock" emails. Uses Resend. |
 
 ### Key Files to Know
 

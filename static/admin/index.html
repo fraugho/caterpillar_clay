@@ -151,6 +151,7 @@
             <button class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">DASHBOARD</button>
             <button class="tab" :class="{ active: tab === 'products' }" @click="tab = 'products'; loadProducts()">PRODUCTS</button>
             <button class="tab" :class="{ active: tab === 'orders' }" @click="tab = 'orders'; loadOrders()">ORDERS</button>
+            <button class="tab" :class="{ active: tab === 'notify' }" @click="tab = 'notify'; loadNotifyProducts()">NOTIFY</button>
             <button class="tab" :class="{ active: tab === 'settings' }" @click="tab = 'settings'; loadArtistSettings()">ARTIST</button>
         </div>
 
@@ -257,10 +258,6 @@
                                 <button class="btn" @click="editProduct(p)">EDIT</button>
                                 <button class="btn btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
-                            <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
-                                <button class="btn btn-sm btn-success" @click="notifyNew(p.id)" title="Notify subscribers about new product">NEW</button>
-                                <button class="btn btn-sm" style="background:#eab308;color:#000" @click="notifyRestock(p.id)" title="Notify subscribers item is back in stock">RESTOCK</button>
-                            </div>
                         </div>
                     </template>
                 </div>
@@ -302,6 +299,40 @@
                         </template>
                     </tbody>
                 </table>
+            </div>
+        </template>
+
+        <!-- Notify -->
+        <template x-if="tab === 'notify'">
+            <div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
+                    <button class="btn btn-success" @click="sendBatchNotify('new')" :disabled="!hasSelectedProducts || sendingNotify">
+                        <span x-text="sendingNotify ? 'SENDING...' : 'SEND NEW PRODUCTS EMAIL'"></span>
+                    </button>
+                    <button class="btn" style="background:#eab308;color:#000" @click="sendBatchNotify('restock')" :disabled="!hasSelectedProducts || sendingNotify">
+                        <span x-text="sendingNotify ? 'SENDING...' : 'SEND IN STOCK EMAIL'"></span>
+                    </button>
+                    <button class="btn btn-sm" style="background:var(--bg-secondary);color:var(--text-primary)" @click="selectAllProducts()">SELECT ALL</button>
+                    <button class="btn btn-sm" style="background:var(--bg-secondary);color:var(--text-primary)" @click="deselectAllProducts()">DESELECT ALL</button>
+                    <span style="font-size:8px;color:var(--text-secondary)">Subscribers: <span x-text="subscriberCount"></span></span>
+                </div>
+
+                <div class="product-grid">
+                    <template x-for="p in notifyProducts" :key="p.id">
+                        <label class="product-card" style="cursor:pointer;position:relative" :style="{ borderColor: p.selected ? 'var(--accent)' : 'var(--border)', borderWidth: p.selected ? '3px' : '2px' }">
+                            <input type="checkbox" x-model="p.selected" style="position:absolute;top:12px;left:12px;width:20px;height:20px;margin:0;z-index:10">
+                            <template x-if="p.images && p.images.length > 0">
+                                <img :src="p.images[0].image_url" :alt="p.name" class="product-img" style="height:280px">
+                            </template>
+                            <template x-if="!p.images || p.images.length === 0">
+                                <div class="placeholder-img" style="height:280px">[NO IMAGE]</div>
+                            </template>
+                            <h4 x-text="p.name"></h4>
+                            <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
+                            <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
+                        </label>
+                    </template>
+                </div>
             </div>
         </template>
 
@@ -530,6 +561,8 @@
                 savingArtist: false,
                 subscriberCount: 0,
                 toast: { show: false, message: '', type: 'success' },
+                notifyProducts: [],
+                sendingNotify: false,
 
                 async init() {
                     // Always load subscriber count for notifications
@@ -540,6 +573,8 @@
                         await this.loadProducts();
                     } else if (this.tab === 'orders') {
                         await this.loadOrders();
+                    } else if (this.tab === 'notify') {
+                        await this.loadNotifyProducts();
                     } else if (this.tab === 'settings') {
                         await this.loadArtistSettings();
                     } else {
@@ -576,49 +611,54 @@
                     setTimeout(() => { this.toast.show = false; }, 4000);
                 },
 
-                async notifyNew(productId) {
-                    const product = this.products.find(p => p.id === productId);
-                    if (!product) return;
+                get hasSelectedProducts() {
+                    return this.notifyProducts.some(p => p.selected);
+                },
 
-                    if (!confirm(`Send "New Product" email for "${product.name}"?`)) return;
-
-                    product.notifying = true;
+                async loadNotifyProducts() {
                     try {
-                        const res = await fetch(`/admin/api/newsletter/notify/new/${productId}`, { method: 'POST' });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.showToast('Sent!', 'success');
-                        } else {
-                            this.showToast('Failed to send emails', 'error');
-                        }
+                        const res = await fetch('/admin/api/products');
+                        const products = await res.json();
+                        this.notifyProducts = products.map(p => ({ ...p, selected: false }));
                     } catch (e) {
-                        console.error('Failed to notify subscribers:', e);
-                        this.showToast('Failed to send emails', 'error');
-                    } finally {
-                        product.notifying = false;
+                        console.error('Failed to load products:', e);
                     }
                 },
 
-                async notifyRestock(productId) {
-                    const product = this.products.find(p => p.id === productId);
-                    if (!product) return;
+                selectAllProducts() {
+                    this.notifyProducts.forEach(p => p.selected = true);
+                },
 
-                    if (!confirm(`Send "Back in Stock" email for "${product.name}"?`)) return;
+                deselectAllProducts() {
+                    this.notifyProducts.forEach(p => p.selected = false);
+                },
 
-                    product.notifying = true;
+                async sendBatchNotify(type) {
+                    const selectedIds = this.notifyProducts.filter(p => p.selected).map(p => p.id);
+                    if (selectedIds.length === 0) return;
+
+                    const typeLabel = type === 'new' ? 'New Products' : 'Back in Stock';
+                    if (!confirm(`Send "${typeLabel}" email with ${selectedIds.length} product(s) to ${this.subscriberCount} subscriber(s)?`)) return;
+
+                    this.sendingNotify = true;
                     try {
-                        const res = await fetch(`/admin/api/newsletter/notify/restock/${productId}`, { method: 'POST' });
+                        const res = await fetch(`/admin/api/newsletter/notify-batch/${type}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ product_ids: selectedIds })
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.showToast('Sent!', 'success');
+                            this.deselectAllProducts();
                         } else {
                             this.showToast('Failed to send emails', 'error');
                         }
                     } catch (e) {
-                        console.error('Failed to notify subscribers:', e);
+                        console.error('Failed to send batch notify:', e);
                         this.showToast('Failed to send emails', 'error');
                     } finally {
-                        product.notifying = false;
+                        this.sendingNotify = false;
                     }
                 },
 
