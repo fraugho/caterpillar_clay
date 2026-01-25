@@ -11,18 +11,24 @@ Recent changes to get you up to speed:
 | **Multi-image products** | Products support multiple images with drag-to-reorder. Stored in `product_images` table. |
 | **Image carousels** | Storefront shows image carousels on product cards and detail pages. |
 | **Polar.sh auto-sync** | Creating/updating/deleting products or images auto-syncs to Polar.sh. |
-| **Cart persistence** | Cart saves to localStorage, persists across tabs/refreshes. |
+| **Cart persistence** | Cart saves to localStorage with quantities, persists across tabs/refreshes. |
 | **SPA routing** | Direct URLs work (e.g., `/product/{id}`, `/cart`, `/orders`). |
 | **Unix timestamps** | All `created_ts`/`updated_ts` fields are integers (Unix epoch seconds). |
 | **R2 storage** | Product images stored in Cloudflare R2 with public URLs. |
+| **Artist page** | `/artist.html` shows artist bio and image, fetched from `site_settings`. |
+| **Admin artist settings** | Admin panel ARTIST tab lets you update artist photo and bio. |
+| **Centered header** | Logo centered, ARTIST on left, CART/account on right. |
 
 ### Key Files to Know
 
 | File | Purpose |
 |------|---------|
 | `static/index.html` | Main storefront SPA (Alpine.js) |
+| `static/artist.html` | Artist bio page |
 | `static/admin/index.html` | Admin panel SPA |
 | `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
+| `src/routes/admin/settings.rs` | Admin artist settings API |
+| `src/models/settings.rs` | Site settings model (artist info) |
 | `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
@@ -99,7 +105,8 @@ clay/
 │   ├── 006_add_polar_price_id.sql
 │   ├── 007_add_polar_product_id.sql
 │   ├── 008_unix_timestamps.sql
-│   └── 009_product_images.sql
+│   ├── 009_product_images.sql
+│   └── 010_site_settings.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -264,6 +271,13 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | quantity | INTEGER | Item quantity |
 | price_cents | INTEGER | Price at time of purchase |
 
+### site_settings
+| Column | Type | Description |
+|--------|------|-------------|
+| key | TEXT PK | Setting key (e.g., `artist_image`, `artist_description`) |
+| value | TEXT | Setting value |
+| updated_ts | INTEGER | Unix timestamp |
+
 ### 3. Build and Run
 
 ```bash
@@ -325,6 +339,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 |--------|----------|-------------|
 | GET | `/api/products` | List active products |
 | GET | `/api/products/:id` | Get single product |
+| GET | `/api/artist` | Get artist info (image, description) |
 
 ### Authenticated (Customer)
 | Method | Endpoint | Description |
@@ -349,6 +364,9 @@ curl -X POST http://localhost:3000/admin/api/products \
 | PUT | `/admin/orders/:id/status` | Update status |
 | POST | `/admin/orders/:id/tracking` | Add tracking |
 | GET | `/admin/dashboard` | Stats overview |
+| GET | `/admin/settings/artist` | Get artist info |
+| PUT | `/admin/settings/artist` | Update artist description |
+| PUT | `/admin/settings/artist/image` | Upload artist image |
 
 ### Webhooks
 | Method | Endpoint | Description |

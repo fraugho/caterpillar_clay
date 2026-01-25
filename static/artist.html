@@ -58,13 +58,12 @@
 
     <nav x-cloak x-show="!initializing" style="background:#97BAD9;padding:20px;position:relative;z-index:1001">
         <div style="max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
-            <a href="/" style="font-size:12px;color:#fff;text-decoration:none;cursor:none">CATERPILLAR CLAY</a>
-            <div style="display:flex;gap:24px;font-size:10px;align-items:center">
+            <div style="flex:1;display:flex;gap:16px;font-size:10px">
                 <a href="/artist.html" style="color:#fff;text-decoration:none">ARTIST</a>
+            </div>
+            <a href="/" style="font-size:14px;color:#fff;text-decoration:none;cursor:none;text-align:center">CATERPILLAR CLAY</a>
+            <div style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end">
                 <a href="/" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount"></span>)</a>
-                <template x-if="user">
-                    <a href="/" style="color:#fff;text-decoration:none">MY ORDERS</a>
-                </template>
                 <template x-if="!user">
                     <button class="auth-btn" @click="signIn()">SIGN IN</button>
                 </template>
@@ -72,6 +71,7 @@
                     <div class="user-menu">
                         <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user.firstName || 'Account'"></button>
                         <div class="user-dropdown" :class="{ show: showUserMenu }">
+                            <a href="/">My Orders</a>
                             <a href="/account.html">Account Settings</a>
                             <template x-if="user.publicMetadata && user.publicMetadata.isAdmin">
                                 <a href="/admin/">Admin Panel</a>
