@@ -615,7 +615,6 @@
                         const data = await res.json();
                         this.newsletterSuccess = data.success;
                         this.newsletterMessage = data.message;
-                        if(data.success) this.newsletterEmail = '';
                     } catch(e) {
                         this.newsletterSuccess = false;
                         this.newsletterMessage = 'Something went wrong. Please try again.';

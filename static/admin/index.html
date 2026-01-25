@@ -245,11 +245,15 @@
                                 </label>
                                 <span class="active-status" x-text="p.is_active ? 'Active' : 'Inactive'"></span>
                             </div>
-                            <div class="product-actions">
+                            <div class="product-actions" style="flex-wrap:wrap">
                                 <button class="btn" @click="editProduct(p)">EDIT</button>
-                                <button class="btn btn-success" @click="notifySubscribers(p.id)" :disabled="p.notifying" x-text="p.notifying ? '...' : 'NOTIFY'"></button>
                                 <button class="btn btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
+                            <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
+                                <button class="btn btn-sm btn-success" @click="notifyNew(p.id)" :disabled="p.notifying" title="Notify subscribers about new product">NEW</button>
+                                <button class="btn btn-sm" style="background:#eab308;color:#000" @click="notifyRestock(p.id)" :disabled="p.notifying" title="Notify subscribers item is back in stock">RESTOCK</button>
+                            </div>
+                            <p x-show="p.notifyMessage" x-text="p.notifyMessage" style="font-size:8px;margin-top:8px;padding:8px;border-radius:6px" :style="{ background: p.notifySuccess ? '#d1fae5' : '#fee2e2', color: p.notifySuccess ? '#065f46' : '#991b1b' }"></p>
                         </div>
                     </template>
                 </div>
@@ -557,26 +561,53 @@
                     }
                 },
 
-                async notifySubscribers(productId) {
+                async notifyNew(productId) {
                     const product = this.products.find(p => p.id === productId);
                     if (!product) return;
 
-                    if (!confirm(`Send new product notification to ${this.subscriberCount} subscribers?`)) return;
+                    if (!confirm(`Send "New Product" notification for "${product.name}" to ${this.subscriberCount} subscribers?`)) return;
 
                     product.notifying = true;
+                    product.notifyMessage = '';
                     try {
-                        const res = await fetch(`/admin/api/newsletter/notify/${productId}`, { method: 'POST' });
+                        const res = await fetch(`/admin/api/newsletter/notify/new/${productId}`, { method: 'POST' });
                         const data = await res.json();
-                        if (data.success) {
-                            alert(`Sent notifications to ${data.sent_count} of ${data.total_subscribers} subscribers`);
-                        } else {
-                            alert('Failed to send notifications');
-                        }
+                        product.notifySuccess = data.success;
+                        product.notifyMessage = data.success
+                            ? `Sent to ${data.sent_count}/${data.total_subscribers} subscribers`
+                            : 'Failed to send';
                     } catch (e) {
                         console.error('Failed to notify subscribers:', e);
-                        alert('Failed to send notifications: ' + e.message);
+                        product.notifySuccess = false;
+                        product.notifyMessage = 'Failed to send';
                     } finally {
                         product.notifying = false;
+                        setTimeout(() => { product.notifyMessage = ''; }, 5000);
+                    }
+                },
+
+                async notifyRestock(productId) {
+                    const product = this.products.find(p => p.id === productId);
+                    if (!product) return;
+
+                    if (!confirm(`Send "Back in Stock" notification for "${product.name}" to ${this.subscriberCount} subscribers?`)) return;
+
+                    product.notifying = true;
+                    product.notifyMessage = '';
+                    try {
+                        const res = await fetch(`/admin/api/newsletter/notify/restock/${productId}`, { method: 'POST' });
+                        const data = await res.json();
+                        product.notifySuccess = data.success;
+                        product.notifyMessage = data.success
+                            ? `Sent to ${data.sent_count}/${data.total_subscribers} subscribers`
+                            : 'Failed to send';
+                    } catch (e) {
+                        console.error('Failed to notify subscribers:', e);
+                        product.notifySuccess = false;
+                        product.notifyMessage = 'Failed to send';
+                    } finally {
+                        product.notifying = false;
+                        setTimeout(() => { product.notifyMessage = ''; }, 5000);
                     }
                 },
 

@@ -130,6 +130,86 @@ impl ResendService {
         Ok(())
     }
 
+    pub async fn send_back_in_stock_notification(
+        &self,
+        to_email: &str,
+        unsubscribe_token: &str,
+        product: &Product,
+        product_image_url: Option<&str>,
+    ) -> AppResult<()> {
+        let unsubscribe_url = format!("{}/api/newsletter/unsubscribe?token={}", self.base_url, unsubscribe_token);
+        let product_url = format!("{}/?product={}", self.base_url, product.id);
+
+        let image_html = if let Some(img_url) = product_image_url {
+            format!(r#"<img src="{}" alt="{}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:20px;border:2px solid #E0E0E0">"#, img_url, product.name)
+        } else {
+            String::new()
+        };
+
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Courier New', monospace; background: #F8F8F8; padding: 20px; margin: 0; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 32px; border: 2px solid #E0E0E0; border-radius: 12px; text-align: center; }}
+        h1 {{ color: #22c55e; font-size: 16px; margin-bottom: 24px; }}
+        h2 {{ color: #18191B; font-size: 14px; margin: 16px 0 8px; }}
+        .price {{ color: #97BAD9; font-size: 18px; margin-bottom: 16px; }}
+        .description {{ color: #666; font-size: 12px; line-height: 1.8; margin-bottom: 24px; }}
+        .btn {{ display: inline-block; background: #22c55e; color: #fff; padding: 14px 28px; text-decoration: none; font-size: 12px; border-radius: 8px; font-family: inherit; }}
+        .footer {{ margin-top: 32px; padding-top: 20px; border-top: 1px solid #E0E0E0; font-size: 10px; color: #666; }}
+        .footer a {{ color: #97BAD9; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Back in Stock!</h1>
+        {}
+        <h2>{}</h2>
+        <p class="price">${:.2}</p>
+        <p class="description">Good news! This item is available again. Grab it before it's gone!</p>
+        <a href="{}" class="btn">SHOP NOW</a>
+        <div class="footer">
+            <p>Caterpillar Clay - Handmade Pottery</p>
+            <p><a href="{}">Unsubscribe</a></p>
+        </div>
+    </div>
+</body>
+</html>"#,
+            image_html,
+            product.name,
+            product.price_cents as f64 / 100.0,
+            product_url,
+            unsubscribe_url
+        );
+
+        self.send_email(
+            to_email,
+            &format!("Back in Stock: {} - Caterpillar Clay", product.name),
+            &html,
+        ).await
+    }
+
+    pub async fn send_batch_back_in_stock_notification(
+        &self,
+        subscribers: &[(String, String)],
+        product: &Product,
+        product_image_url: Option<&str>,
+    ) -> AppResult<usize> {
+        let mut sent_count = 0;
+
+        for (email, token) in subscribers {
+            if let Err(e) = self.send_back_in_stock_notification(email, token, product, product_image_url).await {
+                tracing::error!("Failed to send back in stock notification to {}: {}", email, e);
+            } else {
+                sent_count += 1;
+            }
+        }
+
+        Ok(sent_count)
+    }
+
     pub async fn send_batch_new_product_notification(
         &self,
         subscribers: &[(String, String)], // (email, unsubscribe_token)
