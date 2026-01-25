@@ -69,20 +69,22 @@
         .user-dropdown a:hover{background:var(--accent-hover)}
         .detail-overlay{position:fixed;inset:0;background:var(--bg-primary);z-index:1000;overflow-y:auto;padding:20px}
         .detail-overlay .stars{position:absolute;inset:0;z-index:0;pointer-events:none}
-        .detail-overlay .detail-content{position:relative;z-index:1}
+        .detail-overlay .detail-content{position:relative;z-index:1;display:block}
         .gallery-img{width:100%;max-width:600px;border-radius:12px;margin-bottom:20px;border:2px solid var(--border)}
         .back-btn{position:fixed;top:20px;left:20px;z-index:1002;background:var(--accent);color:#18191B;padding:12px 16px;font-family:inherit;font-size:8px;border:none;cursor:none;border-radius:8px}
         .back-btn:hover{background:var(--accent-hover)}
-        .carousel{position:relative;width:100%;height:380px;overflow:hidden;border-radius:8px;border:2px solid var(--border);margin-bottom:12px}
+        .carousel{position:relative;width:100%;height:380px;overflow:hidden;border-radius:8px;border:2px solid var(--border);margin-bottom:12px;background:var(--bg-secondary)}
         .carousel-inner{display:flex;transition:transform 0.3s ease;height:100%}
-        .carousel-inner img{min-width:100%;height:100%;object-fit:cover}
+        .carousel-inner img{min-width:100%;height:100%;object-fit:cover;background:var(--bg-secondary)}
         .carousel-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.5);color:#fff;border:none;padding:10px 14px;cursor:none;font-size:14px;border-radius:6px;z-index:10}
         .carousel-btn.prev{left:8px}
         .carousel-btn.next{right:8px}
         .carousel-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10}
         .carousel-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.5);border:none;cursor:none}
         .carousel-dot.active{background:#fff}
-        .detail-carousel{width:100%;height:650px;margin:0 auto 32px}
+        .detail-carousel{width:100%;height:650px;margin:0 auto 32px;background:var(--bg-secondary)}
+        .carousel-inner img{background:var(--bg-secondary)}
+        .img-placeholder{background:var(--bg-secondary);display:flex;align-items:center;justify-content:center}
         @media(max-width:768px){
             .detail-carousel{height:300px;margin:0 auto 20px}
             .detail-content>div{margin-top:20px !important}
@@ -95,60 +97,61 @@
     <canvas id="caterpillar" width="72" height="40"></canvas>
 
     <!-- Product Detail Overlay -->
-    <template x-if="selectedProduct">
-        <div class="detail-overlay" x-data="{ detailIdx: 0 }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))">
+    <template x-if="selectedProduct && !initializing">
+        <div class="detail-overlay" x-data="{ detailIdx: 0, imgReady: false }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))">
             <div class="stars"></div>
             <button class="back-btn" @click="closeProduct()">← BACK</button>
             <div class="detail-content">
                 <div style="max-width:900px;margin:80px auto;padding:0 20px">
-                    <div class="card" style="padding:40px;text-align:center">
-                    <template x-if="selectedProduct.images && selectedProduct.images.length > 0">
-                        <div class="carousel detail-carousel">
+                    <div class="card" style="padding:40px;text-align:center;overflow:hidden;display:block" x-show="imgReady || !selectedProduct.images || selectedProduct.images.length === 0" x-transition.opacity.duration.200ms>
+                    <div class="carousel detail-carousel">
+                        <template x-if="selectedProduct.images && selectedProduct.images.length > 0">
                             <div class="carousel-inner" :style="`transform: translateX(-${detailIdx * 100}%)`">
-                                <template x-for="img in selectedProduct.images" :key="img">
-                                    <img :src="img" :alt="selectedProduct.name">
+                                <template x-for="(img, i) in selectedProduct.images" :key="img">
+                                    <img :src="img" :alt="selectedProduct.name" @load="if(i===0) imgReady = true">
                                 </template>
                             </div>
-                            <template x-if="selectedProduct.images.length > 1">
-                                <button class="carousel-btn prev" @click="detailIdx = (detailIdx - 1 + selectedProduct.images.length) % selectedProduct.images.length">&lt;</button>
-                            </template>
-                            <template x-if="selectedProduct.images.length > 1">
-                                <button class="carousel-btn next" @click="detailIdx = (detailIdx + 1) % selectedProduct.images.length">&gt;</button>
-                            </template>
-                            <template x-if="selectedProduct.images.length > 1">
-                                <div class="carousel-dots">
-                                    <template x-for="(img, idx) in selectedProduct.images" :key="img">
-                                        <button class="carousel-dot" :class="{ active: idx === detailIdx }" @click="detailIdx = idx"></button>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                    <template x-if="!selectedProduct.images || selectedProduct.images.length === 0">
-                        <div class="gallery-img" style="height:400px;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary)">[IMAGE]</div>
-                    </template>
-                    <h1 style="font-size:20px;margin-bottom:20px" x-text="selectedProduct.name"></h1>
-                    <p style="font-size:18px;color:var(--accent);margin-bottom:20px">$<span x-text="selectedProduct.price.toFixed(2)"></span></p>
-                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:28px" x-text="selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
-                    <template x-if="selectedProduct.description">
-                        <p style="font-size:10px;color:var(--text-secondary);margin-bottom:28px;line-height:2" x-text="selectedProduct.description"></p>
-                    </template>
-                    <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                        </template>
+                        <template x-if="selectedProduct.images && selectedProduct.images.length > 1">
+                            <button class="carousel-btn prev" @click="detailIdx = (detailIdx - 1 + selectedProduct.images.length) % selectedProduct.images.length">&lt;</button>
+                        </template>
+                        <template x-if="selectedProduct.images && selectedProduct.images.length > 1">
+                            <button class="carousel-btn next" @click="detailIdx = (detailIdx + 1) % selectedProduct.images.length">&gt;</button>
+                        </template>
+                        <template x-if="selectedProduct.images && selectedProduct.images.length > 1">
+                            <div class="carousel-dots">
+                                <template x-for="(img, idx) in selectedProduct.images" :key="img">
+                                    <button class="carousel-dot" :class="{ active: idx === detailIdx }" @click="detailIdx = idx"></button>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    <div style="display:block;width:100%">
+                        <h1 style="font-size:20px;margin-bottom:20px;display:block" x-text="selectedProduct.name"></h1>
+                        <p style="font-size:18px;color:var(--accent);margin-bottom:20px;display:block">$<span x-text="selectedProduct.price.toFixed(2)"></span></p>
+                        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:28px;display:block" x-text="selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
+                        <template x-if="selectedProduct.description">
+                            <p style="font-size:10px;color:var(--text-secondary);margin-bottom:28px;line-height:2;display:block" x-text="selectedProduct.description"></p>
+                        </template>
+                        <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px;display:block" @click="addToCart(selectedProduct);closeProduct()" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                    </div>
                 </div>
 
                 <!-- You may also like -->
                 <template x-if="products.filter(p => p.id !== selectedProduct.id).length > 0">
-                    <div style="margin-top:40px">
+                    <div style="margin-top:40px" x-show="imgReady || !selectedProduct.images || selectedProduct.images.length === 0">
                         <h3 style="font-size:12px;margin-bottom:20px;text-align:center">You may also like</h3>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px">
                             <template x-for="p in products.filter(p => p.id !== selectedProduct.id)" :key="p.id">
-                                <div class="card product-card" style="padding:16px;text-align:center;cursor:none" @click="detailIdx = 0; selectedProduct = p; history.pushState({ page: page, productId: p.id }, '', `/product/${p.id}`)">
-                                    <template x-if="p.images && p.images.length > 0">
-                                        <img :src="p.images[0]" :alt="p.name" style="width:100%;height:280px;object-fit:cover;border-radius:8px;border:2px solid var(--border);margin-bottom:12px">
-                                    </template>
-                                    <template x-if="!p.images || p.images.length === 0">
-                                        <div style="width:100%;height:280px;background:var(--bg-secondary);border-radius:8px;border:2px solid var(--border);margin-bottom:12px;display:flex;align-items:center;justify-content:center;font-size:8px">[IMAGE]</div>
-                                    </template>
+                                <div class="card product-card" style="padding:16px;text-align:center;cursor:none" @click="detailIdx = 0; imgReady = false; selectedProduct = p; history.pushState({ page: page, productId: p.id }, '', `/product/${p.id}`)">
+                                    <div style="width:100%;height:280px;border-radius:8px;border:2px solid var(--border);margin-bottom:12px;background:var(--bg-secondary);overflow:hidden">
+                                        <template x-if="p.images && p.images.length > 0">
+                                            <img :src="p.images[0]" :alt="p.name" style="width:100%;height:100%;object-fit:cover">
+                                        </template>
+                                        <template x-if="!p.images || p.images.length === 0">
+                                            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:8px">[IMAGE]</div>
+                                        </template>
+                                    </div>
                                     <p style="font-size:10px;margin-bottom:8px" x-text="p.name"></p>
                                     <p style="font-size:11px;color:var(--accent)">$<span x-text="p.price.toFixed(2)"></span></p>
                                 </div>
@@ -196,9 +199,9 @@
                 <h2 style="font-size:14px;margin-bottom:24px">Fresh from the Kiln</h2>
                 <div :class="{ loading: loadingProducts }" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px">
                     <template x-for="p in products" :key="p.id">
-                        <div class="card product-card" style="padding:20px;text-align:center" @click="navigateToProduct(p)">
+                        <div class="card product-card" style="padding:20px;text-align:center" @click="navigateToProduct(p)" x-data="{ imgLoaded: false }" x-show="imgLoaded || !p.images || p.images.length === 0" x-transition.opacity.duration.200ms>
                             <template x-if="p.images && p.images.length > 0">
-                                <img :src="p.images[0]" :alt="p.name" class="product-img">
+                                <img :src="p.images[0]" :alt="p.name" class="product-img" @load="imgLoaded = true">
                             </template>
                             <template x-if="!p.images || p.images.length === 0">
                                 <div class="product-img" style="display:flex;align-items:center;justify-content:center;font-size:10px">[IMAGE]</div>
