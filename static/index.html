@@ -142,14 +142,37 @@
                         <template x-if="selectedProduct.description">
                             <p style="font-size:10px;color:var(--text-secondary);margin-bottom:28px;line-height:2;display:block" x-text="selectedProduct.description"></p>
                         </template>
-                        <template x-if="getCartQuantity(selectedProduct.id) === 0">
-                            <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px;display:block" @click="addToCart(selectedProduct)" :disabled="selectedProduct.stock_quantity <= 0">ADD TO CART</button>
+                        <template x-if="selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) === 0">
+                            <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px;display:block" @click="addToCart(selectedProduct)">ADD TO CART</button>
                         </template>
-                        <template x-if="getCartQuantity(selectedProduct.id) > 0">
+                        <template x-if="selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) > 0">
                             <div class="qty-controls" style="max-width:500px;margin:0 auto">
                                 <button class="qty-btn minus" style="padding:18px 24px" @click="updateCartQuantity(selectedProduct.id, -1)">-</button>
                                 <span class="qty-display" style="padding:18px 24px;font-size:12px" x-text="getCartQuantity(selectedProduct.id)"></span>
                                 <button class="qty-btn plus" style="padding:18px 24px" @click="addToCart(selectedProduct)">+</button>
+                            </div>
+                        </template>
+                        <template x-if="selectedProduct.stock_quantity <= 0">
+                            <div style="max-width:500px;margin:0 auto">
+                                <template x-if="notifyProductId !== selectedProduct.id && !notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + selectedProduct.id)">
+                                    <button class="btn" style="background:#f59e0b;color:#18191B;padding:18px 24px;font-size:10px;width:100%" @click="showNotifyForm(selectedProduct.id)">NOTIFY ME WHEN AVAILABLE</button>
+                                </template>
+                                <template x-if="notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + selectedProduct.id)">
+                                    <button class="btn" style="background:#22c55e;padding:18px 24px;font-size:10px;width:100%" disabled>YOU'LL BE NOTIFIED</button>
+                                </template>
+                                <template x-if="notifyProductId === selectedProduct.id">
+                                    <div style="text-align:center">
+                                        <p style="font-size:10px;margin-bottom:16px;color:var(--text-secondary)">Get notified when this item is back in stock</p>
+                                        <input type="email" x-model="notifyEmail" placeholder="your@email.com" style="margin-bottom:12px">
+                                        <div style="display:flex;gap:12px">
+                                            <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="closeNotifyForm()">CANCEL</button>
+                                            <button class="btn" style="flex:1" @click="subscribeProductNotify(selectedProduct.id)" :disabled="notifyingProduct || !notifyEmail">
+                                                <span x-text="notifyingProduct ? 'SUBSCRIBING...' : 'NOTIFY ME'"></span>
+                                            </button>
+                                        </div>
+                                        <p x-show="notifyMessage" x-text="notifyMessage" style="font-size:8px;margin-top:12px" :style="{ color: notifySuccess ? '#22c55e' : '#ef4444' }"></p>
+                                    </div>
+                                </template>
                             </div>
                         </template>
                     </div>
@@ -227,14 +250,36 @@
                             <p style="font-size:10px;margin-bottom:10px" x-text="p.name"></p>
                             <p style="font-size:12px;color:var(--accent);margin-bottom:10px">$<span x-text="p.price.toFixed(2)"></span></p>
                             <p style="font-size:8px;color:var(--text-secondary);margin-bottom:14px" x-text="p.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
-                            <template x-if="getCartQuantity(p.id) === 0">
-                                <button class="btn" @click.stop="addToCart(p)" :disabled="p.stock_quantity <= 0">ADD TO CART</button>
+                            <template x-if="p.stock_quantity > 0 && getCartQuantity(p.id) === 0">
+                                <button class="btn" @click.stop="addToCart(p)">ADD TO CART</button>
                             </template>
-                            <template x-if="getCartQuantity(p.id) > 0">
+                            <template x-if="p.stock_quantity > 0 && getCartQuantity(p.id) > 0">
                                 <div class="qty-controls" @click.stop>
                                     <button class="qty-btn minus" @click.stop="updateCartQuantity(p.id, -1)">-</button>
                                     <span class="qty-display" x-text="getCartQuantity(p.id)"></span>
                                     <button class="qty-btn plus" @click.stop="addToCart(p)">+</button>
+                                </div>
+                            </template>
+                            <template x-if="p.stock_quantity <= 0">
+                                <div @click.stop>
+                                    <template x-if="notifyProductId !== p.id && !notifiedProducts.has((notifyEmail || '').toLowerCase() + ':' + p.id)">
+                                        <button class="btn" style="background:#f59e0b;color:#18191B" @click.stop="showNotifyForm(p.id)">NOTIFY ME</button>
+                                    </template>
+                                    <template x-if="notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + p.id)">
+                                        <button class="btn" style="background:#22c55e" disabled>NOTIFIED</button>
+                                    </template>
+                                    <template x-if="notifyProductId === p.id">
+                                        <div style="text-align:center">
+                                            <input type="email" x-model="notifyEmail" placeholder="your@email.com" style="margin-bottom:8px;font-size:7px;padding:10px" @click.stop>
+                                            <div style="display:flex;gap:8px">
+                                                <button class="btn btn-sm" style="flex:1;background:var(--border);color:var(--text-primary)" @click.stop="closeNotifyForm()">CANCEL</button>
+                                                <button class="btn btn-sm" style="flex:1" @click.stop="subscribeProductNotify(p.id)" :disabled="notifyingProduct || !notifyEmail">
+                                                    <span x-text="notifyingProduct ? '...' : 'NOTIFY'"></span>
+                                                </button>
+                                            </div>
+                                            <p x-show="notifyMessage" x-text="notifyMessage" style="font-size:6px;margin-top:8px" :style="{ color: notifySuccess ? '#22c55e' : '#ef4444' }"></p>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
@@ -433,6 +478,12 @@
                 selectedProduct:null,
                 pendingProductId:null,
                 shipping:{name:'',street:'',city:'',state:'',zip:'',country:'USA'},
+                notifyEmail:'',
+                notifyProductId:null,
+                notifyingProduct:false,
+                notifyMessage:'',
+                notifySuccess:false,
+                notifiedProducts:new Set(),
 
                 get cartTotal(){
                     return this.cart.reduce((a,b)=>a+(b.price * b.quantity),0);
@@ -627,6 +678,46 @@
                         this.newsletterMessage = 'Something went wrong. Please try again.';
                     } finally {
                         this.subscribing = false;
+                    }
+                },
+
+                showNotifyForm(productId){
+                    this.notifyProductId = productId;
+                    this.notifyEmail = this.user?.emailAddresses?.[0]?.emailAddress || '';
+                    this.notifyMessage = '';
+                },
+
+                closeNotifyForm(){
+                    this.notifyProductId = null;
+                    this.notifyEmail = '';
+                    this.notifyMessage = '';
+                },
+
+                async subscribeProductNotify(productId){
+                    const email = this.notifyEmail.toLowerCase().trim();
+                    if(!email) return;
+                    const key = `${email}:${productId}`;
+                    if(this.notifiedProducts.has(key)) return;
+                    this.notifyingProduct = true;
+                    this.notifyMessage = '';
+                    try {
+                        const res = await fetch(`/api/products/${productId}/notify`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: email })
+                        });
+                        const data = await res.json();
+                        this.notifySuccess = data.success;
+                        this.notifyMessage = data.message;
+                        if(data.success) {
+                            this.notifiedProducts.add(key);
+                            setTimeout(() => this.closeNotifyForm(), 2000);
+                        }
+                    } catch(e) {
+                        this.notifySuccess = false;
+                        this.notifyMessage = 'Something went wrong. Please try again.';
+                    } finally {
+                        this.notifyingProduct = false;
                     }
                 },
 

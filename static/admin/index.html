@@ -152,7 +152,6 @@
             <button class="tab" :class="{ active: tab === 'dashboard' }" @click="tab = 'dashboard'">DASHBOARD</button>
             <button class="tab" :class="{ active: tab === 'products' }" @click="tab = 'products'; loadProducts()">PRODUCTS</button>
             <button class="tab" :class="{ active: tab === 'orders' }" @click="tab = 'orders'; loadOrders()">ORDERS</button>
-            <button class="tab" :class="{ active: tab === 'notify' }" @click="tab = 'notify'; loadNotifyProducts()">NOTIFY</button>
             <button class="tab" :class="{ active: tab === 'artist' }" @click="tab = 'artist'; loadArtistSettings()">ARTIST</button>
             <button class="tab" :class="{ active: tab === 'site' }" @click="tab = 'site'; loadSiteSettings()">SITE</button>
         </div>
@@ -214,13 +213,25 @@
         <!-- Products -->
         <template x-if="tab === 'products'">
             <div>
-                <div style="margin-bottom: 16px;">
+                <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
                     <button class="btn" @click="openProductModal()">+ ADD PRODUCT</button>
+                    <template x-if="hasPendingChanges">
+                        <button class="btn btn-success" @click="openReviewModal()">
+                            REVIEW & SAVE (<span x-text="Object.keys(pendingChanges).length"></span> changes)
+                        </button>
+                    </template>
+                    <template x-if="hasPendingChanges">
+                        <button class="btn" style="background:var(--border);color:var(--text-primary)" @click="discardChanges()">DISCARD</button>
+                    </template>
+                    <span style="font-size:8px;color:var(--text-secondary)">Subscribers: <span x-text="subscriberCount"></span></span>
                 </div>
 
                 <div class="product-grid">
                     <template x-for="p in products" :key="p.id">
-                        <div class="product-card" x-data="{ carouselIdx: 0 }">
+                        <div class="product-card" style="position:relative" x-data="{ carouselIdx: 0, editing: false }" :style="{ borderColor: pendingChanges[p.id] ? '#f59e0b' : 'var(--border)', borderWidth: pendingChanges[p.id] ? '3px' : '2px' }">
+                            <template x-if="pendingChanges[p.id]">
+                                <div style="position:absolute;top:8px;right:8px;background:#f59e0b;color:#000;font-size:6px;padding:4px 8px;border-radius:4px;z-index:10">MODIFIED</div>
+                            </template>
                             <template x-if="p.images && p.images.length > 0">
                                 <div class="carousel">
                                     <div class="carousel-inner" :style="`transform: translateX(-${carouselIdx * 100}%)`">
@@ -246,19 +257,43 @@
                             <template x-if="!p.images || p.images.length === 0">
                                 <div class="placeholder-img">[NO IMAGE]</div>
                             </template>
-                            <h4 x-text="p.name"></h4>
-                            <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
-                            <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
-                            <div style="margin-top: 12px; display: flex; align-items: center; justify-content: center;">
+
+                            <!-- Inline editing -->
+                            <template x-if="!editing">
+                                <div>
+                                    <h4 x-text="p.name"></h4>
+                                    <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
+                                    <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
+                                </div>
+                            </template>
+                            <template x-if="editing">
+                                <div style="text-align:left;padding:0 8px">
+                                    <label style="font-size:6px">Name</label>
+                                    <input type="text" x-model="p.name" @input="trackChange(p, 'name', p.name)" style="margin-bottom:8px">
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                                        <div>
+                                            <label style="font-size:6px">Price ($)</label>
+                                            <input type="number" step="0.01" :value="p.price" @input="p.price = parseFloat($event.target.value) || 0; trackChange(p, 'price_cents', Math.round(p.price * 100))" style="margin-bottom:8px">
+                                        </div>
+                                        <div>
+                                            <label style="font-size:6px">Stock</label>
+                                            <input type="number" x-model.number="p.stock_quantity" @input="trackChange(p, 'stock_quantity', p.stock_quantity)" style="margin-bottom:8px">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div style="margin-top:12px;display:flex;align-items:center;justify-content:center">
                                 <label class="toggle">
-                                    <input type="checkbox" :checked="p.is_active" @change="toggleProductActive(p)">
+                                    <input type="checkbox" :checked="p.is_active" @change="p.is_active = !p.is_active; trackChange(p, 'is_active', p.is_active)">
                                     <span class="toggle-slider"></span>
                                 </label>
                                 <span class="active-status" x-text="p.is_active ? 'Active' : 'Inactive'"></span>
                             </div>
                             <div class="product-actions" style="flex-wrap:wrap">
-                                <button class="btn" @click="editProduct(p)">EDIT</button>
-                                <button class="btn btn-danger" @click="deleteProduct(p.id)">DELETE</button>
+                                <button class="btn btn-sm" @click="editing = !editing" x-text="editing ? 'DONE' : 'EDIT'"></button>
+                                <button class="btn btn-sm" @click="editProduct(p)">IMAGES</button>
+                                <button class="btn btn-sm btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
                         </div>
                     </template>
@@ -301,40 +336,6 @@
                         </template>
                     </tbody>
                 </table>
-            </div>
-        </template>
-
-        <!-- Notify -->
-        <template x-if="tab === 'notify'">
-            <div>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
-                    <button class="btn btn-success" @click="sendBatchNotify('new')" :disabled="!hasSelectedProducts || sendingNotify">
-                        <span x-text="sendingNotify ? 'SENDING...' : 'SEND NEW PRODUCTS EMAIL'"></span>
-                    </button>
-                    <button class="btn" style="background:#eab308;color:#000" @click="sendBatchNotify('restock')" :disabled="!hasSelectedProducts || sendingNotify">
-                        <span x-text="sendingNotify ? 'SENDING...' : 'SEND IN STOCK EMAIL'"></span>
-                    </button>
-                    <button class="btn btn-sm" style="background:var(--bg-secondary);color:var(--text-primary)" @click="selectAllProducts()">SELECT ALL</button>
-                    <button class="btn btn-sm" style="background:var(--bg-secondary);color:var(--text-primary)" @click="deselectAllProducts()">DESELECT ALL</button>
-                    <span style="font-size:8px;color:var(--text-secondary)">Subscribers: <span x-text="subscriberCount"></span></span>
-                </div>
-
-                <div class="product-grid">
-                    <template x-for="p in notifyProducts" :key="p.id">
-                        <label class="product-card" style="cursor:pointer;position:relative" :style="{ borderColor: p.selected ? 'var(--accent)' : 'var(--border)', borderWidth: p.selected ? '3px' : '2px' }">
-                            <input type="checkbox" x-model="p.selected" style="position:absolute;top:12px;left:12px;width:20px;height:20px;margin:0;z-index:10">
-                            <template x-if="p.images && p.images.length > 0">
-                                <img :src="p.images[0].image_url" :alt="p.name" class="product-img" style="height:280px">
-                            </template>
-                            <template x-if="!p.images || p.images.length === 0">
-                                <div class="placeholder-img" style="height:280px">[NO IMAGE]</div>
-                            </template>
-                            <h4 x-text="p.name"></h4>
-                            <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
-                            <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
-                        </label>
-                    </template>
-                </div>
             </div>
         </template>
 
@@ -549,6 +550,79 @@
         </div>
     </div>
 
+    <!-- Review Changes Modal -->
+    <div class="modal" :class="{ active: showReviewModal }">
+        <div class="modal-content" style="max-width:700px">
+            <div class="modal-header">
+                <h3>REVIEW CHANGES</h3>
+                <button class="close-btn" @click="showReviewModal = false">&times;</button>
+            </div>
+
+            <!-- Changes List -->
+            <div style="margin-bottom:20px">
+                <h4 style="font-size:10px;color:var(--accent);margin-bottom:12px">CHANGES TO SAVE</h4>
+                <template x-for="change in changesList" :key="change.id">
+                    <div style="background:var(--bg-secondary);padding:12px;margin-bottom:8px;border-radius:8px;border:2px solid var(--border)">
+                        <p style="font-size:10px;font-weight:bold;margin-bottom:8px" x-text="change.name"></p>
+                        <template x-for="(val, field) in change.changes" :key="field">
+                            <p style="font-size:8px;color:var(--text-secondary)">
+                                <span x-text="field.replace('_', ' ').replace('cents', '')"></span>:
+                                <span style="color:#ef4444" x-text="field === 'price_cents' ? '$' + (val.from / 100).toFixed(2) : val.from"></span>
+                                →
+                                <span style="color:#22c55e" x-text="field === 'price_cents' ? '$' + (val.to / 100).toFixed(2) : val.to"></span>
+                            </p>
+                        </template>
+                        <template x-if="change.wasOutOfStock && change.newStock > 0">
+                            <p style="font-size:8px;color:#f59e0b;margin-top:4px">⚡ RESTOCK - will notify customers</p>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Email Preview Section -->
+            <template x-if="restockedProducts.length > 0">
+                <div style="margin-bottom:20px">
+                    <h4 style="font-size:10px;color:#f59e0b;margin-bottom:12px">📧 RESTOCK EMAILS WILL BE SENT</h4>
+                    <div style="background:var(--bg-secondary);padding:16px;border-radius:8px;border:2px solid #f59e0b">
+                        <p style="font-size:8px;color:var(--text-secondary);margin-bottom:8px">
+                            Customers who clicked "Notify Me" will receive emails for:
+                        </p>
+                        <template x-for="p in restockedProducts" :key="p.id">
+                            <p style="font-size:9px;margin-bottom:4px">• <span x-text="p.name"></span></p>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="newProducts.length > 0">
+                <div style="margin-bottom:20px">
+                    <h4 style="font-size:10px;color:#22c55e;margin-bottom:12px">📧 NEW PRODUCT EMAILS WILL BE SENT</h4>
+                    <div style="background:var(--bg-secondary);padding:16px;border-radius:8px;border:2px solid #22c55e">
+                        <p style="font-size:8px;color:var(--text-secondary);margin-bottom:8px">
+                            <span x-text="subscriberCount"></span> newsletter subscribers will be notified about:
+                        </p>
+                        <template x-for="p in newProducts" :key="p.id">
+                            <p style="font-size:9px;margin-bottom:4px">• <span x-text="p.name"></span></p>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Action Buttons -->
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="showReviewModal = false">CANCEL</button>
+                <button class="btn" style="flex:1" @click="saveAllChanges(false)" :disabled="savingChanges">
+                    <span x-text="savingChanges ? 'SAVING...' : 'SAVE WITHOUT EMAILS'"></span>
+                </button>
+                <template x-if="restockedProducts.length > 0 || newProducts.length > 0">
+                    <button class="btn btn-success" style="flex:1" @click="saveAllChanges(true)" :disabled="savingChanges">
+                        <span x-text="savingChanges ? 'SAVING...' : 'SAVE & SEND EMAILS'"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Generate pixel stars
         (function generateStars(){
@@ -589,9 +663,12 @@
                 savingArtist: false,
                 subscriberCount: 0,
                 toast: { show: false, message: '', type: 'success' },
-                notifyProducts: [],
-                sendingNotify: false,
                 favicon: null,
+                // Change tracking
+                originalProducts: {},
+                pendingChanges: {},
+                showReviewModal: false,
+                savingChanges: false,
                 faviconPreview: null,
                 faviconFile: null,
                 savingFavicon: false,
@@ -605,8 +682,6 @@
                         await this.loadProducts();
                     } else if (this.tab === 'orders') {
                         await this.loadOrders();
-                    } else if (this.tab === 'notify') {
-                        await this.loadNotifyProducts();
                     } else if (this.tab === 'artist') {
                         await this.loadArtistSettings();
                     } else if (this.tab === 'site') {
@@ -645,54 +720,142 @@
                     setTimeout(() => { this.toast.show = false; }, 4000);
                 },
 
-                get hasSelectedProducts() {
-                    return this.notifyProducts.some(p => p.selected);
+                // Change tracking methods
+                get hasPendingChanges() {
+                    return Object.keys(this.pendingChanges).length > 0;
                 },
 
-                async loadNotifyProducts() {
-                    try {
-                        const res = await fetch('/admin/api/products');
-                        const products = await res.json();
-                        this.notifyProducts = products.map(p => ({ ...p, selected: false }));
-                    } catch (e) {
-                        console.error('Failed to load products:', e);
+                get changesList() {
+                    const changes = [];
+                    for (const [id, change] of Object.entries(this.pendingChanges)) {
+                        changes.push(change);
+                    }
+                    return changes;
+                },
+
+                get newProducts() {
+                    return this.changesList.filter(c => c.isNew);
+                },
+
+                get restockedProducts() {
+                    return this.changesList.filter(c => !c.isNew && c.wasOutOfStock && c.newStock > 0);
+                },
+
+                trackChange(product, field, newValue) {
+                    const original = this.originalProducts[product.id];
+                    if (!this.pendingChanges[product.id]) {
+                        this.pendingChanges[product.id] = {
+                            id: product.id,
+                            name: product.name,
+                            changes: {},
+                            isNew: false,
+                            wasOutOfStock: original?.stock_quantity === 0,
+                            newStock: product.stock_quantity
+                        };
+                    }
+
+                    // Get original value - handle price_cents specially
+                    let originalValue;
+                    if (field === 'price_cents') {
+                        originalValue = original ? Math.round(original.price * 100) : null;
+                    } else {
+                        originalValue = original ? original[field] : null;
+                    }
+
+                    if (newValue !== originalValue) {
+                        this.pendingChanges[product.id].changes[field] = {
+                            from: originalValue,
+                            to: newValue
+                        };
+                        // Update the display name
+                        this.pendingChanges[product.id].name = product.name;
+                    } else {
+                        delete this.pendingChanges[product.id].changes[field];
+                    }
+
+                    // Update newStock for restock detection
+                    if (field === 'stock_quantity') {
+                        this.pendingChanges[product.id].newStock = newValue;
+                    }
+
+                    // Remove if no changes left
+                    if (Object.keys(this.pendingChanges[product.id].changes).length === 0) {
+                        delete this.pendingChanges[product.id];
                     }
                 },
 
-                selectAllProducts() {
-                    this.notifyProducts.forEach(p => p.selected = true);
+                discardChanges() {
+                    this.pendingChanges = {};
+                    this.loadProducts();
                 },
 
-                deselectAllProducts() {
-                    this.notifyProducts.forEach(p => p.selected = false);
+                openReviewModal() {
+                    this.showReviewModal = true;
                 },
 
-                async sendBatchNotify(type) {
-                    const selectedIds = this.notifyProducts.filter(p => p.selected).map(p => p.id);
-                    if (selectedIds.length === 0) return;
-
-                    const typeLabel = type === 'new' ? 'New Products' : 'Back in Stock';
-                    if (!confirm(`Send "${typeLabel}" email with ${selectedIds.length} product(s) to ${this.subscriberCount} subscriber(s)?`)) return;
-
-                    this.sendingNotify = true;
+                async saveAllChanges(sendEmails = false) {
+                    this.savingChanges = true;
                     try {
-                        const res = await fetch(`/admin/api/newsletter/notify-batch/${type}`, {
-                            method: 'POST',
+                        // Prepare batch update data
+                        const updates = [];
+                        for (const [id, change] of Object.entries(this.pendingChanges)) {
+                            const product = this.products.find(p => p.id === id);
+                            if (!product) {
+                                console.error('Product not found in local list:', id);
+                                continue;
+                            }
+
+                            updates.push({
+                                id: product.id,
+                                name: product.name,
+                                description: product.description || null,
+                                price_cents: Math.round(product.price * 100),
+                                stock_quantity: parseInt(product.stock_quantity) || 0,
+                                is_active: product.is_active,
+                                was_out_of_stock: change.wasOutOfStock,
+                                is_new: change.isNew
+                            });
+                        }
+
+                        console.log('Sending batch update:', JSON.stringify({ updates, send_emails: sendEmails }, null, 2));
+
+                        // Send batch update to backend
+                        const res = await fetch('/admin/api/products-batch', {
+                            method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ product_ids: selectedIds })
+                            body: JSON.stringify({
+                                updates: updates,
+                                send_emails: sendEmails
+                            })
                         });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.showToast('Sent!', 'success');
-                            this.deselectAllProducts();
+
+                        let data;
+                        const text = await res.text();
+                        try {
+                            data = text ? JSON.parse(text) : {};
+                        } catch (e) {
+                            console.error('Failed to parse response:', text);
+                            throw new Error('Server returned invalid response: ' + text.substring(0, 100));
+                        }
+
+                        if (res.ok) {
+                            this.showReviewModal = false;
+                            this.pendingChanges = {};
+                            await this.loadProducts();
+
+                            if (sendEmails && data.emails_sent > 0) {
+                                this.showToast(`Saved! ${data.emails_sent} emails sent.`, 'success');
+                            } else {
+                                this.showToast('Changes saved!', 'success');
+                            }
                         } else {
-                            this.showToast('Failed to send emails', 'error');
+                            this.showToast(data.error || 'Failed to save changes', 'error');
                         }
                     } catch (e) {
-                        console.error('Failed to send batch notify:', e);
-                        this.showToast('Failed to send emails', 'error');
+                        console.error('Failed to save changes:', e);
+                        this.showToast('Failed to save changes', 'error');
                     } finally {
-                        this.sendingNotify = false;
+                        this.savingChanges = false;
                     }
                 },
 
@@ -700,6 +863,12 @@
                     try {
                         const res = await fetch('/admin/api/products');
                         this.products = await res.json();
+                        // Store original state for change tracking
+                        this.originalProducts = {};
+                        this.pendingChanges = {};
+                        for (const p of this.products) {
+                            this.originalProducts[p.id] = JSON.parse(JSON.stringify(p));
+                        }
                     } catch (e) {
                         console.error('Failed to load products:', e);
                     }

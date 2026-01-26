@@ -396,4 +396,64 @@ impl ResendService {
 
         self.send_email(to_email, &subject, &html).await
     }
+
+    /// Send a one-time "back in stock" notification for product-specific signups
+    /// This is different from newsletter - no unsubscribe link since it's a one-time email
+    pub async fn send_product_restock_alert(
+        &self,
+        to_email: &str,
+        product: &Product,
+        product_image_url: Option<&str>,
+    ) -> AppResult<()> {
+        let product_url = format!("{}/?product={}", self.base_url, product.id);
+
+        let image_html = if let Some(img_url) = product_image_url {
+            format!(r#"<img src="{}" alt="{}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:20px;border:2px solid #E0E0E0">"#, img_url, product.name)
+        } else {
+            String::new()
+        };
+
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Courier New', monospace; background: #F8F8F8; padding: 20px; margin: 0; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 32px; border: 2px solid #E0E0E0; border-radius: 12px; text-align: center; }}
+        h1 {{ color: #22c55e; font-size: 16px; margin-bottom: 24px; }}
+        h2 {{ color: #18191B; font-size: 14px; margin: 16px 0 8px; }}
+        .price {{ color: #97BAD9; font-size: 18px; margin-bottom: 16px; }}
+        .description {{ color: #666; font-size: 12px; line-height: 1.8; margin-bottom: 24px; }}
+        .btn {{ display: inline-block; background: #22c55e; color: #fff; padding: 14px 28px; text-decoration: none; font-size: 12px; border-radius: 8px; font-family: inherit; }}
+        .footer {{ margin-top: 32px; padding-top: 20px; border-top: 1px solid #E0E0E0; font-size: 10px; color: #666; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>It's Back!</h1>
+        <p style="font-size:12px;color:#666;margin-bottom:24px">The item you wanted is back in stock</p>
+        {}
+        <h2>{}</h2>
+        <p class="price">${:.2}</p>
+        <p class="description">Grab it before it's gone again!</p>
+        <a href="{}" class="btn">SHOP NOW</a>
+        <div class="footer">
+            <p>Caterpillar Clay - Handmade Pottery</p>
+            <p style="color:#999;font-size:9px">You received this email because you signed up to be notified when this item was back in stock. This is a one-time notification.</p>
+        </div>
+    </div>
+</body>
+</html>"#,
+            image_html,
+            product.name,
+            product.price_cents as f64 / 100.0,
+            product_url
+        );
+
+        self.send_email(
+            to_email,
+            &format!("It's Back! {} is in stock - Caterpillar Clay", product.name),
+            &html,
+        ).await
+    }
 }

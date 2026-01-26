@@ -6,7 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateProduct, Product, ProductImage, UpdateProduct};
+use crate::models::{CreateProduct, Product, ProductImage, ProductNotification, UpdateProduct};
 use crate::routes::AppState;
 
 #[derive(Serialize)]
@@ -74,10 +74,36 @@ pub struct ReorderImagesRequest {
     pub image_ids: Vec<String>,
 }
 
+#[derive(Deserialize)]
+pub struct BatchProductUpdate {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub price_cents: i32,
+    pub stock_quantity: i32,
+    pub is_active: bool,
+    pub was_out_of_stock: bool,
+    pub is_new: bool,
+}
+
+#[derive(Deserialize)]
+pub struct BatchUpdateRequest {
+    pub updates: Vec<BatchProductUpdate>,
+    pub send_emails: bool,
+}
+
+#[derive(Serialize)]
+pub struct BatchUpdateResponse {
+    pub success: bool,
+    pub updated_count: usize,
+    pub emails_sent: usize,
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/products", get(list_products))
         .route("/products", post(create_product))
+        .route("/products-batch", put(batch_update_products))
         .route("/products/{id}", get(get_product))
         .route("/products/{id}", put(update_product))
         .route("/products/{id}", delete(delete_product))
@@ -98,6 +124,88 @@ async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<Admi
     }
 
     Ok(Json(responses))
+}
+
+async fn batch_update_products(
+    State(state): State<AppState>,
+    Json(payload): Json<BatchUpdateRequest>,
+) -> AppResult<Json<BatchUpdateResponse>> {
+    tracing::info!("Batch update request: {} products, send_emails: {}", payload.updates.len(), payload.send_emails);
+
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let mut updated_count = 0;
+    let mut emails_sent = 0;
+
+    // Collect products that need restock notifications
+    let mut restocked_products: Vec<(Product, Option<String>)> = Vec::new();
+
+    for update in &payload.updates {
+        tracing::info!("Updating product: {} ({})", update.name, update.id);
+
+        // Update the product
+        let update_data = UpdateProduct {
+            name: Some(update.name.clone()),
+            description: update.description.clone(),
+            price_cents: Some(update.price_cents),
+            stock_quantity: Some(update.stock_quantity),
+            is_active: Some(update.is_active),
+            image_path: None,
+            polar_price_id: None,
+        };
+
+        let product = match Product::update(&conn, &update.id, update_data).await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::error!("Failed to update product {}: {:?}", update.id, e);
+                return Err(e);
+            }
+        };
+        updated_count += 1;
+
+        // Check if this is a restock (was out of stock, now has stock)
+        if payload.send_emails && update.was_out_of_stock && update.stock_quantity > 0 {
+            // Get first image for email
+            let images = ProductImage::list_by_product(&conn, &product.id).await?;
+            let image_url = images.first().map(|img| {
+                if img.image_path.starts_with("http") {
+                    img.image_path.clone()
+                } else {
+                    state.storage.public_url(&img.image_path)
+                }
+            });
+            restocked_products.push((product, image_url));
+        }
+    }
+
+    // Send restock notifications
+    if payload.send_emails && !restocked_products.is_empty() {
+        if let Some(ref resend) = state.resend {
+            for (product, image_url) in &restocked_products {
+                // Get all pending notifications for this product
+                let notifications = ProductNotification::get_pending_for_product(&conn, &product.id).await?;
+
+                for notification in &notifications {
+                    if let Err(e) = resend
+                        .send_product_restock_alert(&notification.email, product, image_url.as_deref())
+                        .await
+                    {
+                        tracing::error!("Failed to send restock alert to {}: {}", notification.email, e);
+                    } else {
+                        emails_sent += 1;
+                    }
+                }
+
+                // Mark all as notified
+                ProductNotification::mark_all_notified_for_product(&conn, &product.id).await?;
+            }
+        }
+    }
+
+    Ok(Json(BatchUpdateResponse {
+        success: true,
+        updated_count,
+        emails_sent,
+    }))
 }
 
 async fn get_product(
@@ -156,11 +264,51 @@ async fn update_product(
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
+    // Check if this is a restock (was 0, now > 0)
+    let was_out_of_stock = current.stock_quantity == 0;
+    let new_stock = payload.stock_quantity;
+
     // Extract values for Polar sync
     let name_update = payload.name.clone();
     let desc_update = payload.description.clone();
 
     let product = Product::update(&conn, &id, payload).await?;
+
+    // Send restock notifications if product was restocked
+    if was_out_of_stock && new_stock.map(|s| s > 0).unwrap_or(false) {
+        let notifications = ProductNotification::get_pending_for_product(&conn, &id).await?;
+
+        if !notifications.is_empty() {
+            // Get first image for email
+            let images = ProductImage::list_by_product(&conn, &id).await?;
+            let image_url = images.first().map(|img| {
+                if img.image_path.starts_with("http") {
+                    img.image_path.clone()
+                } else {
+                    state.storage.public_url(&img.image_path)
+                }
+            });
+
+            // Send notifications
+            if let Some(ref resend) = state.resend {
+                let mut sent_count = 0;
+                for notification in &notifications {
+                    if let Err(e) = resend
+                        .send_product_restock_alert(&notification.email, &product, image_url.as_deref())
+                        .await
+                    {
+                        tracing::error!("Failed to send restock alert to {}: {}", notification.email, e);
+                    } else {
+                        sent_count += 1;
+                    }
+                }
+                tracing::info!("Sent {} restock notifications for product {}", sent_count, product.name);
+            }
+
+            // Mark all as notified
+            ProductNotification::mark_all_notified_for_product(&conn, &id).await?;
+        }
+    }
 
     // Sync to Polar if product is linked
     if let Some(polar_product_id) = &current.polar_product_id {

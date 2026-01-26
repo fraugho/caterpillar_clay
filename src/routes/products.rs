@@ -1,12 +1,12 @@
 use axum::{
     extract::{Path, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{Product, ProductImage};
+use crate::models::{Product, ProductImage, ProductNotification};
 use crate::routes::AppState;
 
 #[derive(Serialize)]
@@ -49,6 +49,7 @@ pub fn public_routes() -> Router<AppState> {
     Router::new()
         .route("/products", get(list_products))
         .route("/products/{id}", get(get_product))
+        .route("/products/{id}/notify", post(subscribe_notification))
 }
 
 async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<ProductResponse>>> {
@@ -80,4 +81,44 @@ async fn get_product(
     let images = ProductImage::list_by_product(&conn, &id).await?;
 
     Ok(Json(ProductResponse::from_product(product, images, &state)))
+}
+
+#[derive(Deserialize)]
+pub struct NotifyRequest {
+    pub email: String,
+}
+
+#[derive(Serialize)]
+pub struct NotifyResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+async fn subscribe_notification(
+    State(state): State<AppState>,
+    Path(product_id): Path<String>,
+    Json(payload): Json<NotifyRequest>,
+) -> AppResult<Json<NotifyResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    // Verify product exists
+    let product = Product::find_by_id(&conn, &product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // Only allow notifications for out-of-stock products
+    if product.stock_quantity > 0 {
+        return Ok(Json(NotifyResponse {
+            success: false,
+            message: "This product is currently in stock".to_string(),
+        }));
+    }
+
+    // Subscribe to notification
+    ProductNotification::subscribe(&conn, &payload.email, &product_id).await?;
+
+    Ok(Json(NotifyResponse {
+        success: true,
+        message: "You'll be notified when this item is back in stock".to_string(),
+    }))
 }
