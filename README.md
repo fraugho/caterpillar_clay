@@ -18,7 +18,10 @@ Recent changes to get you up to speed:
 | **Artist page** | `/artist.html` shows artist bio and image, fetched from `site_settings`. |
 | **Admin artist settings** | Admin panel ARTIST tab lets you update artist photo and bio. |
 | **Centered header** | Logo centered, ARTIST on left, CART/account on right. |
-| **Newsletter** | Visitors can subscribe. Admin NOTIFY tab to select multiple products and send combined "New Products" or "In Stock" emails. Uses Resend. |
+| **Newsletter** | Visitors can subscribe. Admin can send combined "New Products" emails. Uses Resend. |
+| **Notify Me** | Out-of-stock products show "Notify Me" button. Customers enter email for one-time restock alert. |
+| **Auto restock emails** | When admin restocks a product (0→positive), restock emails auto-send to all subscribers. |
+| **Admin batch editing** | Edit multiple products inline, review changes in modal, confirm before saving. |
 
 ### Key Files to Know
 
@@ -34,6 +37,7 @@ Recent changes to get you up to speed:
 | `src/services/resend.rs` | Resend email service for newsletters |
 | `src/models/settings.rs` | Site settings model (artist info) |
 | `src/models/newsletter.rs` | Newsletter subscriber model |
+| `src/models/product_notification.rs` | Product restock notification subscriptions |
 | `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
@@ -112,7 +116,8 @@ clay/
 │   ├── 008_unix_timestamps.sql
 │   ├── 009_product_images.sql
 │   ├── 010_site_settings.sql
-│   └── 011_newsletter_subscribers.sql
+│   ├── 011_newsletter_subscribers.sql
+│   └── 012_product_notifications.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -295,6 +300,16 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | subscribed_ts | INTEGER | Unix timestamp |
 | unsubscribe_token | TEXT UNIQUE | Token for unsubscribe link |
 
+### product_notifications
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| email | TEXT | Subscriber email |
+| product_id | TEXT FK | References products(id) |
+| notified | INTEGER | 0 = pending, 1 = sent |
+| created_ts | INTEGER | Unix timestamp |
+| notified_ts | INTEGER | When notification was sent |
+
 ### 3. Build and Run
 
 ```bash
@@ -359,6 +374,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 | GET | `/api/artist` | Get artist info (image, description) |
 | POST | `/api/newsletter/subscribe` | Subscribe to newsletter |
 | GET | `/api/newsletter/unsubscribe?token=` | Unsubscribe from newsletter |
+| POST | `/api/products/:id/notify` | Subscribe to restock notification |
 
 ### Authenticated (Customer)
 | Method | Endpoint | Description |
@@ -388,6 +404,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 | PUT | `/admin/settings/artist/image` | Upload artist image |
 | GET | `/admin/newsletter/subscribers` | Get subscriber count |
 | POST | `/admin/newsletter/notify/:product_id` | Send new product notification to all subscribers |
+| PUT | `/admin/products-batch` | Batch update multiple products (auto-sends restock emails) |
 
 ### Webhooks
 | Method | Endpoint | Description |

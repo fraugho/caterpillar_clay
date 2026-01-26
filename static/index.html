@@ -154,10 +154,10 @@
                         </template>
                         <template x-if="selectedProduct.stock_quantity <= 0">
                             <div style="max-width:500px;margin:0 auto">
-                                <template x-if="notifyProductId !== selectedProduct.id && !notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + selectedProduct.id)">
+                                <template x-if="notifyProductId !== selectedProduct.id && !isProductNotified(selectedProduct.id)">
                                     <button class="btn" style="background:#f59e0b;color:#18191B;padding:18px 24px;font-size:10px;width:100%" @click="showNotifyForm(selectedProduct.id)">NOTIFY ME WHEN AVAILABLE</button>
                                 </template>
-                                <template x-if="notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + selectedProduct.id)">
+                                <template x-if="isProductNotified(selectedProduct.id)">
                                     <button class="btn" style="background:#22c55e;padding:18px 24px;font-size:10px;width:100%" disabled>YOU'LL BE NOTIFIED</button>
                                 </template>
                                 <template x-if="notifyProductId === selectedProduct.id">
@@ -262,10 +262,10 @@
                             </template>
                             <template x-if="p.stock_quantity <= 0">
                                 <div @click.stop>
-                                    <template x-if="notifyProductId !== p.id && !notifiedProducts.has((notifyEmail || '').toLowerCase() + ':' + p.id)">
+                                    <template x-if="notifyProductId !== p.id && !isProductNotified(p.id)">
                                         <button class="btn" style="background:#f59e0b;color:#18191B" @click.stop="showNotifyForm(p.id)">NOTIFY ME</button>
                                     </template>
-                                    <template x-if="notifiedProducts.has((user?.emailAddresses?.[0]?.emailAddress || '').toLowerCase() + ':' + p.id)">
+                                    <template x-if="isProductNotified(p.id)">
                                         <button class="btn" style="background:#22c55e" disabled>NOTIFIED</button>
                                     </template>
                                     <template x-if="notifyProductId === p.id">
@@ -507,6 +507,14 @@
                     }
                 },
 
+                isProductNotified(productId){
+                    // Check if any email has been notified for this product
+                    for(const key of this.notifiedProducts){
+                        if(key.endsWith(':' + productId)) return true;
+                    }
+                    return false;
+                },
+
                 get isShippingValid(){
                     return this.shipping.name && this.shipping.street && this.shipping.city && this.shipping.state && this.shipping.zip;
                 },
@@ -549,6 +557,17 @@
                     this.$watch('cart', (value) => {
                         localStorage.setItem('cart', JSON.stringify(value));
                     });
+
+                    // Load notifiedProducts from localStorage
+                    const savedNotified = localStorage.getItem('notifiedProducts');
+                    if (savedNotified) {
+                        try {
+                            const arr = JSON.parse(savedNotified);
+                            this.notifiedProducts = new Set(arr);
+                        } catch(e) {
+                            this.notifiedProducts = new Set();
+                        }
+                    }
 
                     await this.loadProducts();
 
@@ -711,6 +730,7 @@
                         this.notifyMessage = data.message;
                         if(data.success) {
                             this.notifiedProducts.add(key);
+                            localStorage.setItem('notifiedProducts', JSON.stringify([...this.notifiedProducts]));
                             setTimeout(() => this.closeNotifyForm(), 2000);
                         }
                     } catch(e) {
