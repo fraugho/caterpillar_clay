@@ -153,7 +153,8 @@
             <button class="tab" :class="{ active: tab === 'products' }" @click="tab = 'products'; loadProducts()">PRODUCTS</button>
             <button class="tab" :class="{ active: tab === 'orders' }" @click="tab = 'orders'; loadOrders()">ORDERS</button>
             <button class="tab" :class="{ active: tab === 'notify' }" @click="tab = 'notify'; loadNotifyProducts()">NOTIFY</button>
-            <button class="tab" :class="{ active: tab === 'settings' }" @click="tab = 'settings'; loadArtistSettings()">ARTIST</button>
+            <button class="tab" :class="{ active: tab === 'artist' }" @click="tab = 'artist'; loadArtistSettings()">ARTIST</button>
+            <button class="tab" :class="{ active: tab === 'site' }" @click="tab = 'site'; loadSiteSettings()">SITE</button>
         </div>
 
         <!-- Dashboard -->
@@ -337,11 +338,11 @@
             </div>
         </template>
 
-        <!-- Settings -->
-        <template x-if="tab === 'settings'">
+        <!-- Artist -->
+        <template x-if="tab === 'artist'">
             <div>
                 <div class="card">
-                    <h2>ABOUT THE ARTIST</h2>
+                    <h2>MEET THE ARTIST</h2>
                     <div class="preview-section">
                         <div class="form-section">
                             <form @submit.prevent="saveArtistSettings()">
@@ -375,6 +376,32 @@
                             <div style="background:var(--accent);border-radius:8px;padding:16px;margin-top:12px">
                                 <p style="font-size:8px;line-height:2;color:#18191B" x-text="artistSettings.description || 'Artist description will appear here...'"></p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Site Settings -->
+        <template x-if="tab === 'site'">
+            <div>
+                <div class="card">
+                    <h2>FAVICON</h2>
+                    <div style="display:flex;align-items:center;gap:20px">
+                        <div class="image-upload" style="width:100px;height:100px;padding:10px" @click="$refs.faviconInput.click()">
+                            <input type="file" x-ref="faviconInput" @change="handleFaviconSelect($event)" accept="image/png,image/x-icon">
+                            <template x-if="faviconPreview || favicon">
+                                <img :src="faviconPreview || favicon" style="width:64px;height:64px;object-fit:contain">
+                            </template>
+                            <template x-if="!faviconPreview && !favicon">
+                                <p style="font-size:6px;color:var(--text-secondary);text-align:center">Click to upload</p>
+                            </template>
+                        </div>
+                        <div>
+                            <p style="font-size:8px;color:var(--text-secondary);margin-bottom:8px">Upload a PNG image (32x32 recommended)</p>
+                            <button class="btn btn-sm" @click="saveFavicon()" :disabled="!faviconFile || savingFavicon">
+                                <span x-text="savingFavicon ? 'SAVING...' : 'SAVE FAVICON'"></span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -564,6 +591,10 @@
                 toast: { show: false, message: '', type: 'success' },
                 notifyProducts: [],
                 sendingNotify: false,
+                favicon: null,
+                faviconPreview: null,
+                faviconFile: null,
+                savingFavicon: false,
 
                 async init() {
                     // Always load subscriber count for notifications
@@ -576,8 +607,10 @@
                         await this.loadOrders();
                     } else if (this.tab === 'notify') {
                         await this.loadNotifyProducts();
-                    } else if (this.tab === 'settings') {
+                    } else if (this.tab === 'artist') {
                         await this.loadArtistSettings();
+                    } else if (this.tab === 'site') {
+                        await this.loadSiteSettings();
                     } else {
                         await this.loadDashboard();
                     }
@@ -899,6 +932,52 @@
                         };
                     } catch (e) {
                         console.error('Failed to load artist settings:', e);
+                    }
+                },
+
+                async loadSiteSettings() {
+                    try {
+                        const res = await fetch('/admin/api/settings/favicon');
+                        const data = await res.json();
+                        this.favicon = data.url;
+                    } catch (e) {
+                        console.error('Failed to load favicon:', e);
+                    }
+                },
+
+                handleFaviconSelect(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        this.faviconFile = file;
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.faviconPreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    event.target.value = '';
+                },
+
+                async saveFavicon() {
+                    if (!this.faviconFile) return;
+                    this.savingFavicon = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', this.faviconFile);
+                        const res = await fetch('/admin/api/settings/favicon', {
+                            method: 'PUT',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        this.favicon = data.url;
+                        this.faviconPreview = null;
+                        this.faviconFile = null;
+                        this.showToast('Favicon saved!', 'success');
+                    } catch (e) {
+                        console.error('Failed to save favicon:', e);
+                        this.showToast('Failed to save favicon', 'error');
+                    } finally {
+                        this.savingFavicon = false;
                     }
                 },
 

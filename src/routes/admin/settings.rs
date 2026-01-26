@@ -14,6 +14,8 @@ pub fn routes() -> Router<AppState> {
         .route("/settings/artist", get(get_artist_info))
         .route("/settings/artist", put(update_artist_info))
         .route("/settings/artist/image", put(upload_artist_image))
+        .route("/settings/favicon", get(get_favicon))
+        .route("/settings/favicon", put(upload_favicon))
 }
 
 async fn get_artist_info(State(state): State<AppState>) -> AppResult<Json<ArtistInfo>> {
@@ -71,4 +73,45 @@ async fn upload_artist_image(
 
     let info = Setting::get_artist_info(&conn).await?;
     Ok(Json(info))
+}
+
+#[derive(serde::Serialize)]
+pub struct FaviconResponse {
+    pub url: Option<String>,
+}
+
+async fn get_favicon(State(state): State<AppState>) -> AppResult<Json<FaviconResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+    let url = Setting::get(&conn, "site_favicon").await?;
+    Ok(Json(FaviconResponse { url }))
+}
+
+async fn upload_favicon(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> AppResult<Json<FaviconResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        AppError::BadRequest(format!("Failed to process upload: {}", e))
+    })? {
+        let data = field.bytes().await.map_err(|e| {
+            AppError::BadRequest(format!("Failed to read upload: {}", e))
+        })?;
+
+        // Upload to storage in site folder
+        let path = state
+            .storage
+            .upload_to_folder("site", "favicon.png", &data)
+            .await
+            .map_err(|e| AppError::Storage(e.to_string()))?;
+
+        // Get public URL and save to settings
+        let favicon_url = state.storage.public_url(&path);
+        Setting::set(&conn, "site_favicon", &favicon_url).await?;
+
+        return Ok(Json(FaviconResponse { url: Some(favicon_url) }));
+    }
+
+    Err(AppError::BadRequest("No file uploaded".to_string()))
 }
