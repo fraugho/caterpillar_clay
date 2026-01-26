@@ -10,28 +10,35 @@ use serde_json::json;
 use crate::models::{Order, OrderStatus, Product, User};
 use crate::routes::AppState;
 use crate::services::easypost::EasyPostWebhookEvent;
-use crate::services::polar::PolarWebhookEvent;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/webhooks/polar", post(polar_webhook))
+        .route("/webhooks/stripe", post(stripe_webhook))
         .route("/webhooks/easypost", post(easypost_webhook))
 }
 
-async fn polar_webhook(
+async fn stripe_webhook(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // Verify webhook signature (in production)
-    let _signature = headers
-        .get("polar-signature")
-        .and_then(|h| h.to_str().ok());
+    // Get Stripe signature header
+    let signature = match headers.get("stripe-signature").and_then(|h| h.to_str().ok()) {
+        Some(sig) => sig,
+        None => {
+            tracing::error!("Missing Stripe signature header");
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Missing signature"})),
+            );
+        }
+    };
 
-    let event: PolarWebhookEvent = match serde_json::from_slice(&body) {
-        Ok(e) => e,
+    // Convert body to string for verification
+    let payload = match std::str::from_utf8(&body) {
+        Ok(p) => p,
         Err(e) => {
-            tracing::error!("Failed to parse Polar webhook: {}", e);
+            tracing::error!("Invalid UTF-8 in webhook body: {}", e);
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({"error": "Invalid payload"})),
@@ -39,7 +46,19 @@ async fn polar_webhook(
         }
     };
 
-    tracing::info!("Received Polar webhook: {}", event.event_type);
+    // Verify webhook signature
+    let event = match state.stripe.verify_webhook(payload, signature) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::error!("Stripe webhook verification failed: {}", e);
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "Invalid signature"})),
+            );
+        }
+    };
+
+    tracing::info!("Received Stripe webhook: {}", event.event_type);
 
     let conn = match state.db.connect() {
         Ok(c) => c,
@@ -53,9 +72,15 @@ async fn polar_webhook(
     };
 
     match event.event_type.as_str() {
-        "checkout.completed" => {
-            if let Some(checkout_id) = event.data.get("id").and_then(|v| v.as_str()) {
-                match Order::find_by_polar_checkout(&conn, checkout_id).await {
+        "checkout.session.completed" => {
+            // Get order_id from metadata
+            let order_id = event.data.object
+                .get("metadata")
+                .and_then(|m| m.get("order_id"))
+                .and_then(|v| v.as_str());
+
+            if let Some(order_id) = order_id {
+                match Order::find_by_id(&conn, order_id).await {
                     Ok(Some(order)) => {
                         // Update order status to paid
                         if let Err(e) = Order::update_status(&conn, &order.id, OrderStatus::Paid).await {
@@ -81,19 +106,21 @@ async fn polar_webhook(
                             }
                         }
 
-                        tracing::info!("Order {} marked as paid", order.id);
+                        tracing::info!("Order {} marked as paid via Stripe", order.id);
                     }
                     Ok(None) => {
-                        tracing::warn!("Order not found for checkout: {}", checkout_id);
+                        tracing::warn!("Order not found: {}", order_id);
                     }
                     Err(e) => {
                         tracing::error!("Database error: {}", e);
                     }
                 }
+            } else {
+                tracing::warn!("No order_id in checkout session metadata");
             }
         }
         _ => {
-            tracing::debug!("Unhandled Polar event type: {}", event.event_type);
+            tracing::debug!("Unhandled Stripe event type: {}", event.event_type);
         }
     }
 

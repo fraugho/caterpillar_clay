@@ -10,7 +10,7 @@ Recent changes to get you up to speed:
 |---------|-------------|
 | **Multi-image products** | Products support multiple images with drag-to-reorder. Stored in `product_images` table. |
 | **Image carousels** | Storefront shows image carousels on product cards and detail pages. |
-| **Polar.sh auto-sync** | Creating/updating/deleting products or images auto-syncs to Polar.sh. |
+| **Stripe auto-sync** | Creating/updating/deleting products or images auto-syncs to Stripe. |
 | **Cart persistence** | Cart saves to localStorage with quantities, persists across tabs/refreshes. |
 | **SPA routing** | Direct URLs work (e.g., `/product/{id}`, `/cart`, `/orders`). |
 | **Unix timestamps** | All `created_ts`/`updated_ts` fields are integers (Unix epoch seconds). |
@@ -35,7 +35,7 @@ Recent changes to get you up to speed:
 | `static/index.html` | Main storefront SPA (Alpine.js) |
 | `static/artist.html` | Artist bio page |
 | `static/gallium/index.html` | Admin panel SPA |
-| `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
+| `src/routes/admin/products.rs` | Admin product CRUD + Stripe sync |
 | `src/routes/admin/settings.rs` | Admin artist settings API |
 | `src/routes/newsletter.rs` | Newsletter subscribe/unsubscribe API |
 | `src/routes/admin/newsletter.rs` | Admin newsletter notify endpoints |
@@ -44,7 +44,7 @@ Recent changes to get you up to speed:
 | `src/models/newsletter.rs` | Newsletter subscriber model |
 | `src/models/product_notification.rs` | Product restock notification subscriptions |
 | `src/models/product_style.rs` | Product styles/variants model |
-| `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
+| `src/services/stripe.rs` | Stripe API client (payments, products, checkout) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
 
@@ -73,7 +73,7 @@ Recent changes to get you up to speed:
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │   Routes    │  │  Services   │  │   Storage   │             │
 │  │  /api/*     │  │  - Clerk    │  │  - Local    │             │
-│  │  /admin/*   │  │  - Polar    │  │  - R2       │             │
+│  │  /admin/*   │  │  - Stripe   │  │  - R2       │             │
 │  │  /webhooks  │  │  - EasyPost │  │             │             │
 │  └─────────────┘  │  - Email    │  └─────────────┘             │
 │                   └─────────────┘                               │
@@ -88,7 +88,7 @@ Recent changes to get you up to speed:
          ┌───────────────┴───────────────┐
          ▼                               ▼
 ┌──────────────┐                ┌──────────────┐
-│   Polar.sh   │                │ Email (SMTP) │
+│    Stripe    │                │ Email (SMTP) │
 │  (Payments)  │                │   Resend     │
 └──────────────┘                └──────────────┘
 ```
@@ -99,7 +99,7 @@ Recent changes to get you up to speed:
 - **Database**: libsql/Turso (SQLite compatible, edge-ready)
 - **Storage**: Cloudflare R2 (S3-compatible)
 - **Authentication**: Clerk
-- **Payments**: Polar.sh
+- **Payments**: Stripe (currently using test mode - see Stripe Integration section)
 - **Shipping**: EasyPost
 - **Email**: SMTP (Resend/SES)
 - **Frontend**: HTMX + Alpine.js
@@ -117,14 +117,15 @@ clay/
 │   ├── 003_create_orders.sql
 │   ├── 004_create_order_items.sql
 │   ├── 005_seed_products.sql
-│   ├── 006_add_polar_price_id.sql
-│   ├── 007_add_polar_product_id.sql
+│   ├── 006_add_polar_price_id.sql      # Legacy (renamed in 014)
+│   ├── 007_add_polar_product_id.sql    # Legacy (renamed in 014)
 │   ├── 008_unix_timestamps.sql
 │   ├── 009_product_images.sql
 │   ├── 010_site_settings.sql
 │   ├── 011_newsletter_subscribers.sql
 │   ├── 012_product_notifications.sql
-│   └── 013_product_styles.sql
+│   ├── 013_product_styles.sql
+│   └── 014_rename_polar_to_stripe.sql  # Renames polar_* columns to stripe_*
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -140,7 +141,7 @@ clay/
 │   │   └── webhooks.rs     # Payment/shipping webhooks
 │   ├── services/           # External integrations
 │   │   ├── clerk.rs        # Clerk auth
-│   │   ├── polar.rs        # Payments
+│   │   ├── stripe.rs       # Payments & products
 │   │   ├── easypost.rs     # Shipping
 │   │   └── email.rs        # Notifications
 │   ├── storage/            # File storage (Local/R2)
@@ -160,7 +161,7 @@ clay/
 - Rust (latest stable)
 - External service accounts (optional for development):
   - Clerk (authentication)
-  - Polar.sh (payments)
+  - Stripe (payments) - test keys work for development
   - EasyPost (shipping)
   - Resend/SMTP (email)
 
@@ -187,9 +188,11 @@ DATABASE_URL=./caterpillar_clay.db
 CLERK_SECRET_KEY=sk_test_xxxxx
 CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
 
-# For payments (get from polar.sh)
-POLAR_ACCESS_TOKEN=polar_at_xxxxx
-POLAR_WEBHOOK_SECRET=whsec_xxxxx
+# For payments (get from stripe.com/dashboard)
+# Currently using TEST keys - switch to live keys for production
+STRIPE_SECRET_KEY=sk_test_xxxxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
 # For shipping (get from easypost.com)
 EASYPOST_API_KEY=EZAK_xxxxx
@@ -255,8 +258,8 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | image_path | TEXT | Legacy single image (use product_images instead) |
 | stock_quantity | INTEGER | Available stock |
 | is_active | INTEGER | 1 = visible in storefront |
-| polar_product_id | TEXT | Polar.sh product ID |
-| polar_price_id | TEXT | Polar.sh price ID |
+| stripe_product_id | TEXT | Stripe product ID (prod_xxx) |
+| stripe_price_id | TEXT | Stripe price ID (price_xxx) |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
 
@@ -279,7 +282,7 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | shipping_address | TEXT | JSON address object |
 | tracking_number | TEXT | Shipping tracking number |
 | easypost_tracker_id | TEXT | EasyPost tracker ID |
-| polar_checkout_id | TEXT | Polar.sh checkout ID |
+| stripe_session_id | TEXT | Stripe checkout session ID |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
 
@@ -356,7 +359,7 @@ The server will start on `http://localhost:3000`.
 - Requires admin user (set `is_admin = true` in database)
 - Or set `TESTING_MODE=true` in `.env` to bypass auth
 - Manage products, view orders, add tracking
-- **Auto-sync**: Product changes automatically sync to Polar.sh (create, update, archive, images)
+- **Auto-sync**: Product changes automatically sync to Stripe (create, update, archive, images)
 
 ### Making a User Admin
 
@@ -406,14 +409,14 @@ curl -X POST http://localhost:3000/admin/api/products \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/gallium/products` | All products with images |
-| POST | `/gallium/products` | Create product (auto-syncs to Polar) |
+| POST | `/gallium/products` | Create product (auto-syncs to Stripe) |
 | GET | `/gallium/products/:id` | Get single product |
-| PUT | `/gallium/products/:id` | Update product (auto-syncs to Polar) |
-| DELETE | `/gallium/products/:id` | Delete product (archives in Polar) |
+| PUT | `/gallium/products/:id` | Update product (auto-syncs to Stripe) |
+| DELETE | `/gallium/products/:id` | Delete product (archives in Stripe) |
 | POST | `/gallium/products/:id/images` | Upload images (multipart, auto-syncs) |
 | PUT | `/gallium/products/:id/images/reorder` | Reorder images |
 | DELETE | `/gallium/products/:id/images/:image_id` | Delete image |
-| POST | `/gallium/products/:id/sync-polar` | Manual Polar sync |
+| POST | `/gallium/products/:id/sync-stripe` | Manual Stripe sync |
 | POST | `/gallium/products/:id/styles` | Create style |
 | PUT | `/gallium/products/:id/styles/:style_id` | Update style |
 | DELETE | `/gallium/products/:id/styles/:style_id` | Delete style |
@@ -432,55 +435,56 @@ curl -X POST http://localhost:3000/admin/api/products \
 ### Webhooks
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/webhooks/polar` | Payment confirmations |
-| POST | `/api/webhooks/easypost` | Shipping updates |
+| POST | `/webhooks/stripe` | Stripe payment confirmations |
+| POST | `/webhooks/easypost` | Shipping updates |
 
-## Polar.sh Integration
+## Stripe Integration
 
-The admin dashboard automatically syncs products to Polar.sh when you create, update, delete, or upload images for products. Each product stores both `polar_product_id` and `polar_price_id` for tracking. The admin panel is the single source of truth - all changes propagate to Polar, R2 storage, and Turso automatically.
+The admin dashboard automatically syncs products to Stripe when you create, update, delete, or upload images for products. Each product stores both `stripe_product_id` and `stripe_price_id` for tracking. The admin panel is the single source of truth - all changes propagate to Stripe, R2 storage, and Turso automatically.
 
-### Token Scopes Required
+### Current Status: TEST MODE
 
-When creating a Polar.sh access token, enable these scopes:
-- `products:read`
-- `products:write`
-- `files:read`
-- `files:write`
-- `organizations:read`
-- `checkouts:read`
-- `checkouts:write`
+**Important:** The application is currently configured with Stripe **test keys**. Before going to production:
 
-### API Tips
+1. Create live API keys at https://dashboard.stripe.com/apikeys
+2. Update environment variables:
+   ```bash
+   STRIPE_SECRET_KEY=sk_live_xxxxx      # Replace sk_test_ with sk_live_
+   STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx  # Replace pk_test_ with pk_live_
+   ```
+3. Set up a production webhook endpoint at https://dashboard.stripe.com/webhooks
+4. Update `STRIPE_WEBHOOK_SECRET` with the live webhook signing secret
+5. Re-sync all products to create them in the live Stripe account
 
-**Trailing slashes are required** - Polar's API returns 307 redirects without them:
-```rust
-// Wrong - returns 307
-format!("{}/v1/products", base_url)
+### Features
 
-// Correct
-format!("{}/v1/products/", base_url)
+- **Product sync**: Products created/updated in admin automatically sync to Stripe
+- **Image sync**: Product images (up to 8) are synced as URLs to Stripe products
+- **Price management**: Prices are created when products are created. When prices change, a new price is created and the old one is archived (Stripe doesn't allow deleting prices)
+- **Checkout sessions**: Stripe Checkout handles the payment flow with shipping address collection
+- **Webhook handling**: `checkout.session.completed` events mark orders as paid and decrement stock
+
+### Local Development with Stripe CLI
+
+For testing webhooks locally:
+
+```bash
+# Install Stripe CLI
+brew install stripe/stripe-cli/stripe
+
+# Login to Stripe
+stripe login
+
+# Forward webhooks to your local server
+stripe listen --forward-to localhost:3000/webhooks/stripe
+
+# Copy the webhook signing secret (whsec_...) to your .env file
 ```
-
-**Organization tokens don't need organization_id** - If using an organization-scoped token, do NOT include `organization_id` in request bodies:
-```rust
-// Wrong for org tokens - returns "organization_token" error
-json!({ "name": "Product", "organization_id": "..." })
-
-// Correct for org tokens
-json!({ "name": "Product" })
-```
-
-**Image uploads require SHA256 checksums** - When uploading product images:
-1. Request an upload URL with the file's SHA256 checksum
-2. Include `x-amz-checksum-sha256` header in the S3 PUT request
-3. Complete the upload by calling the file complete endpoint
 
 ### Webhook Events
 
-Configure your webhook endpoint at `https://yourdomain.com/api/webhooks/polar` to receive:
-- `checkout.created` - Customer started checkout
-- `checkout.updated` - Checkout status changed
-- `order.created` - Order was placed
+Configure your webhook endpoint at `https://yourdomain.com/webhooks/stripe` to receive:
+- `checkout.session.completed` - Payment successful, order marked as paid
 
 ## Deployment
 
@@ -494,7 +498,7 @@ cargo build --release
 
 - Set `BASE_URL` to your production domain
 - Configure proper SMTP credentials
-- Set up webhook endpoints in Polar.sh and EasyPost dashboards
+- Set up webhook endpoints in Stripe and EasyPost dashboards
 - Set `TESTING_MODE=false`
 
 ### Running with systemd

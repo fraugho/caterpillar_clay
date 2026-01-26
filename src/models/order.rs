@@ -59,7 +59,7 @@ pub struct Order {
     pub shipping_address: String,
     pub tracking_number: Option<String>,
     pub easypost_tracker_id: Option<String>,
-    pub polar_checkout_id: Option<String>,
+    pub stripe_session_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
 }
@@ -74,7 +74,7 @@ impl Order {
             shipping_address: row.get(4)?,
             tracking_number: row.get(5)?,
             easypost_tracker_id: row.get(6)?,
-            polar_checkout_id: row.get(7)?,
+            stripe_session_id: row.get(7)?,
             created_ts: row.get(10)?,
             updated_ts: row.get(11)?,
         })
@@ -114,7 +114,7 @@ pub struct CreateOrder {
     pub user_id: Option<String>,
     pub total_cents: i32,
     pub shipping_address: ShippingAddress,
-    pub polar_checkout_id: Option<String>,
+    pub stripe_session_id: Option<String>,
     pub items: Vec<CreateOrderItem>,
 }
 
@@ -143,9 +143,9 @@ impl Order {
         }
     }
 
-    pub async fn find_by_polar_checkout(conn: &Connection, checkout_id: &str) -> AppResult<Option<Self>> {
+    pub async fn find_by_stripe_session(conn: &Connection, session_id: &str) -> AppResult<Option<Self>> {
         let mut rows = conn
-            .query("SELECT * FROM orders WHERE polar_checkout_id = ?", [checkout_id])
+            .query("SELECT * FROM orders WHERE stripe_session_id = ?", [session_id])
             .await
             .map_err(AppError::from)?;
 
@@ -194,8 +194,8 @@ impl Order {
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
         conn.execute(
-            "INSERT INTO orders (id, user_id, total_cents, shipping_address, polar_checkout_id, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.polar_checkout_id.clone(), now, now],
+            "INSERT INTO orders (id, user_id, total_cents, shipping_address, stripe_session_id, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.stripe_session_id.clone(), now, now],
         )
         .await
         .map_err(AppError::from)?;
@@ -213,6 +213,24 @@ impl Order {
         Self::find_by_id(conn, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Failed to create order".to_string()))
+    }
+
+    pub async fn set_stripe_session(conn: &Connection, id: &str, session_id: &str) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        conn.execute(
+            "UPDATE orders SET stripe_session_id = ?, updated_ts = ? WHERE id = ?",
+            libsql::params![session_id.to_string(), now, id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Self::find_by_id(conn, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Order not found".to_string()))
     }
 
     pub async fn update_status(conn: &Connection, id: &str, status: OrderStatus) -> AppResult<Self> {

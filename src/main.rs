@@ -13,7 +13,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::Config;
 use crate::routes::{create_router, AppState};
-use crate::services::{ClerkService, EasyPostService, EmailService, PolarService, ResendService};
+use crate::services::{ClerkService, EasyPostService, EmailService, ResendService, StripeService};
 use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize services
     let clerk = ClerkService::new(&config.clerk_secret_key);
-    let polar = PolarService::new(&config.polar_access_token);
+    let stripe = StripeService::new(&config.stripe_secret_key, &config.stripe_webhook_secret);
     let easypost = EasyPostService::new(&config.easypost_api_key);
 
     let email = match EmailService::new(
@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db: Arc::new(db),
         config: config.clone(),
         clerk,
-        polar,
+        stripe,
         easypost,
         email,
         resend,

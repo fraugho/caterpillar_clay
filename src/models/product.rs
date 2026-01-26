@@ -138,8 +138,8 @@ pub struct Product {
     pub image_path: Option<String>,
     pub stock_quantity: i32,
     pub is_active: bool,
-    pub polar_price_id: Option<String>,
-    pub polar_product_id: Option<String>,
+    pub stripe_price_id: Option<String>,
+    pub stripe_product_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
 }
@@ -158,8 +158,8 @@ impl Product {
             image_path: row.get(4)?,
             stock_quantity: row.get(5)?,
             is_active: row.get::<i32>(6)? != 0,
-            polar_price_id: row.get(9)?,
-            polar_product_id: row.get(10)?,
+            stripe_price_id: row.get(9)?,
+            stripe_product_id: row.get(10)?,
             created_ts: row.get(11)?,
             updated_ts: row.get(12)?,
         })
@@ -182,7 +182,7 @@ pub struct UpdateProduct {
     pub image_path: Option<String>,
     pub stock_quantity: Option<i32>,
     pub is_active: Option<bool>,
-    pub polar_price_id: Option<String>,
+    pub stripe_price_id: Option<String>,
 }
 
 impl Product {
@@ -257,7 +257,7 @@ impl Product {
         let image_path = data.image_path.or(current.image_path);
         let stock_quantity = data.stock_quantity.unwrap_or(current.stock_quantity);
         let is_active = data.is_active.unwrap_or(current.is_active) as i32;
-        let polar_price_id = data.polar_price_id.or(current.polar_price_id);
+        let stripe_price_id = data.stripe_price_id.or(current.stripe_price_id);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -272,11 +272,11 @@ impl Product {
                 image_path = ?,
                 stock_quantity = ?,
                 is_active = ?,
-                polar_price_id = ?,
+                stripe_price_id = ?,
                 updated_ts = ?
             WHERE id = ?
             "#,
-            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, polar_price_id, now, id.to_string()],
+            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, stripe_price_id, now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;
@@ -304,11 +304,11 @@ impl Product {
             .ok_or_else(|| AppError::NotFound("Product not found".to_string()))
     }
 
-    pub async fn set_polar_ids(
+    pub async fn set_stripe_ids(
         conn: &Connection,
         id: &str,
-        polar_product_id: &str,
-        polar_price_id: &str,
+        stripe_product_id: &str,
+        stripe_price_id: &str,
     ) -> AppResult<Self> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -316,8 +316,8 @@ impl Product {
             .as_secs() as i64;
 
         conn.execute(
-            "UPDATE products SET polar_product_id = ?, polar_price_id = ?, updated_ts = ? WHERE id = ?",
-            libsql::params![polar_product_id.to_string(), polar_price_id.to_string(), now, id.to_string()],
+            "UPDATE products SET stripe_product_id = ?, stripe_price_id = ?, updated_ts = ? WHERE id = ?",
+            libsql::params![stripe_product_id.to_string(), stripe_price_id.to_string(), now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

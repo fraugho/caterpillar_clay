@@ -52,8 +52,8 @@ pub struct AdminProductResponse {
     pub styles: Vec<AdminStyleResponse>,
     pub stock_quantity: i32,
     pub is_active: bool,
-    pub polar_product_id: Option<String>,
-    pub polar_price_id: Option<String>,
+    pub stripe_product_id: Option<String>,
+    pub stripe_price_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
 }
@@ -103,8 +103,8 @@ impl AdminProductResponse {
             styles: style_responses,
             stock_quantity: product.stock_quantity,
             is_active: product.is_active,
-            polar_product_id: product.polar_product_id,
-            polar_price_id: product.polar_price_id,
+            stripe_product_id: product.stripe_product_id,
+            stripe_price_id: product.stripe_price_id,
             created_ts: product.created_ts,
             updated_ts: product.updated_ts,
         }
@@ -171,7 +171,7 @@ pub fn routes() -> Router<AppState> {
         .route("/products/{id}/images", post(upload_image))
         .route("/products/{id}/images/reorder", put(reorder_images))
         .route("/products/{id}/images/{image_id}", delete(delete_image))
-        .route("/products/{id}/sync-polar", post(sync_to_polar))
+        .route("/products/{id}/sync-stripe", post(sync_to_stripe))
         // Style routes
         .route("/products/{id}/styles", post(create_style))
         .route("/products/{id}/styles/reorder", put(reorder_styles))
@@ -209,6 +209,11 @@ async fn batch_update_products(
     for update in &payload.updates {
         tracing::info!("Updating product: {} ({})", update.name, update.id);
 
+        // Get current product state for Stripe sync
+        let current = Product::find_by_id(&conn, &update.id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
         // Update the product
         let update_data = UpdateProduct {
             name: Some(update.name.clone()),
@@ -217,10 +222,10 @@ async fn batch_update_products(
             stock_quantity: Some(update.stock_quantity),
             is_active: Some(update.is_active),
             image_path: None,
-            polar_price_id: None,
+            stripe_price_id: None,
         };
 
-        let product = match Product::update(&conn, &update.id, update_data).await {
+        let mut product = match Product::update(&conn, &update.id, update_data).await {
             Ok(p) => p,
             Err(e) => {
                 tracing::error!("Failed to update product {}: {:?}", update.id, e);
@@ -228,6 +233,48 @@ async fn batch_update_products(
             }
         };
         updated_count += 1;
+
+        // Sync to Stripe
+        if let Some(stripe_product_id) = &current.stripe_product_id {
+            // Get images for Stripe (max 8)
+            let images = ProductImage::list_by_product(&conn, &update.id).await?;
+            let image_urls: Vec<String> = images
+                .iter()
+                .take(8)
+                .map(|img| state.storage.public_url(&img.image_path))
+                .collect();
+
+            // Update product details in Stripe
+            if let Err(e) = state
+                .stripe
+                .update_product(
+                    stripe_product_id,
+                    Some(&update.name),
+                    update.description.as_deref(),
+                    if image_urls.is_empty() { None } else { Some(image_urls) },
+                )
+                .await
+            {
+                tracing::warn!("Failed to sync product to Stripe: {}", e);
+            }
+
+            // Create new price if price changed (Stripe prices are immutable)
+            if update.price_cents != current.price_cents {
+                match state
+                    .stripe
+                    .update_price(stripe_product_id, update.price_cents as i64, current.stripe_price_id.as_deref())
+                    .await
+                {
+                    Ok(new_price_id) => {
+                        tracing::info!("Created new Stripe price {} for product {}", new_price_id, update.id);
+                        product = Product::set_stripe_ids(&conn, &update.id, stripe_product_id, &new_price_id).await?;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to update price in Stripe: {}", e);
+                    }
+                }
+            }
+        }
 
         // Check if this is a restock (was out of stock, now has stock)
         if payload.send_emails && update.was_out_of_stock && update.stock_quantity > 0 {
@@ -296,24 +343,24 @@ async fn create_product(
 ) -> AppResult<Json<AdminProductResponse>> {
     let conn = state.db.connect().map_err(AppError::from)?;
 
-    // Extract values for Polar sync before moving payload
+    // Extract values for Stripe sync before moving payload
     let name = payload.name.clone();
     let description = payload.description.clone();
     let price_cents = payload.price_cents;
 
     let mut product = Product::create(&conn, payload).await?;
 
-    // Sync to Polar
+    // Sync to Stripe
     match state
-        .polar
-        .create_product(&name, description.as_deref(), price_cents)
+        .stripe
+        .create_product(&name, description.as_deref(), price_cents as i64, vec![])
         .await
     {
-        Ok((polar_product_id, polar_price_id)) => {
-            product = Product::set_polar_ids(&conn, &product.id, &polar_product_id, &polar_price_id).await?;
+        Ok((stripe_product_id, stripe_price_id)) => {
+            product = Product::set_stripe_ids(&conn, &product.id, &stripe_product_id, &stripe_price_id).await?;
         }
         Err(e) => {
-            tracing::warn!("Failed to sync product to Polar: {}", e);
+            tracing::warn!("Failed to sync product to Stripe: {}", e);
         }
     }
 
@@ -336,7 +383,7 @@ async fn update_product(
     let was_out_of_stock = current.stock_quantity == 0;
     let new_stock = payload.stock_quantity;
 
-    // Extract values for Polar sync
+    // Extract values for Stripe sync
     let name_update = payload.name.clone();
     let desc_update = payload.description.clone();
 
@@ -378,18 +425,72 @@ async fn update_product(
         }
     }
 
-    // Sync to Polar if product is linked
-    if let Some(polar_product_id) = &current.polar_product_id {
+    // Get images for Stripe sync (Stripe allows max 8 images)
+    let images = ProductImage::list_by_product(&conn, &id).await?;
+    let image_urls: Vec<String> = images
+        .iter()
+        .take(8)
+        .map(|img| state.storage.public_url(&img.image_path))
+        .collect();
+
+    // Sync to Stripe - create if not linked, update if linked
+    let product = if let Some(stripe_product_id) = &current.stripe_product_id {
+        // Update existing Stripe product (name, description, images)
         if let Err(e) = state
-            .polar
-            .update_product(polar_product_id, name_update.as_deref(), desc_update.as_deref())
+            .stripe
+            .update_product(
+                stripe_product_id,
+                name_update.as_deref(),
+                desc_update.as_deref(),
+                if image_urls.is_empty() { None } else { Some(image_urls) },
+            )
             .await
         {
-            tracing::warn!("Failed to sync product update to Polar: {}", e);
+            tracing::warn!("Failed to sync product update to Stripe: {}", e);
         }
-    }
 
-    let images = ProductImage::list_by_product(&conn, &id).await?;
+        // Check if price changed - Stripe prices are immutable, so create a new one
+        if product.price_cents != current.price_cents {
+            match state
+                .stripe
+                .update_price(stripe_product_id, product.price_cents as i64, current.stripe_price_id.as_deref())
+                .await
+            {
+                Ok(new_price_id) => {
+                    tracing::info!("Created new Stripe price {} for product {}", new_price_id, product.id);
+                    // Update only the price_id, keep the product_id
+                    Product::set_stripe_ids(&conn, &product.id, stripe_product_id, &new_price_id).await?
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to update price in Stripe: {}", e);
+                    product
+                }
+            }
+        } else {
+            product
+        }
+    } else {
+        // Create new Stripe product
+        match state
+            .stripe
+            .create_product(
+                &product.name,
+                product.description.as_deref(),
+                product.price_cents as i64,
+                image_urls,
+            )
+            .await
+        {
+            Ok((stripe_product_id, stripe_price_id)) => {
+                Product::set_stripe_ids(&conn, &product.id, &stripe_product_id, &stripe_price_id).await?
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create product in Stripe: {}", e);
+                product
+            }
+        }
+    };
+
     let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
     Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
@@ -412,10 +513,10 @@ async fn delete_product(
     // Delete image records from database
     ProductImage::delete_by_product(&conn, &id).await?;
 
-    // Archive in Polar if linked
-    if let Some(polar_product_id) = &product.polar_product_id {
-        if let Err(e) = state.polar.archive_product(polar_product_id).await {
-            tracing::warn!("Failed to archive product in Polar: {}", e);
+    // Archive in Stripe if linked
+    if let Some(stripe_product_id) = &product.stripe_product_id {
+        if let Err(e) = state.stripe.archive_product(stripe_product_id).await {
+            tracing::warn!("Failed to archive product in Stripe: {}", e);
         }
     }
 
@@ -486,10 +587,15 @@ async fn upload_image(
     let images = ProductImage::list_by_product(&conn, &id).await?;
     let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
-    // Sync all images to Polar if product is linked
-    if product.polar_product_id.is_some() {
-        if let Err(e) = sync_product_images_to_polar(&state, &product, &images).await {
-            tracing::warn!("Failed to sync images to Polar: {}", e);
+    // Sync all images to Stripe if product is linked
+    if let Some(stripe_product_id) = &product.stripe_product_id {
+        let image_urls: Vec<String> = images
+            .iter()
+            .map(|img| state.storage.public_url(&img.image_path))
+            .collect();
+
+        if let Err(e) = state.stripe.update_product(stripe_product_id, None, None, Some(image_urls)).await {
+            tracing::warn!("Failed to sync images to Stripe: {}", e);
         }
     }
 
@@ -514,10 +620,15 @@ async fn reorder_images(
     let images = ProductImage::list_by_product(&conn, &id).await?;
     let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
-    // Sync reordered images to Polar
-    if product.polar_product_id.is_some() {
-        if let Err(e) = sync_product_images_to_polar(&state, &product, &images).await {
-            tracing::warn!("Failed to sync reordered images to Polar: {}", e);
+    // Sync reordered images to Stripe
+    if let Some(stripe_product_id) = &product.stripe_product_id {
+        let image_urls: Vec<String> = images
+            .iter()
+            .map(|img| state.storage.public_url(&img.image_path))
+            .collect();
+
+        if let Err(e) = state.stripe.update_product(stripe_product_id, None, None, Some(image_urls)).await {
+            tracing::warn!("Failed to sync reordered images to Stripe: {}", e);
         }
     }
 
@@ -547,68 +658,39 @@ async fn delete_image(
     let images = ProductImage::list_by_product(&conn, &product_id).await?;
     let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
 
-    // Sync updated images to Polar
-    if product.polar_product_id.is_some() {
-        if let Err(e) = sync_product_images_to_polar(&state, &product, &images).await {
-            tracing::warn!("Failed to sync images after delete to Polar: {}", e);
+    // Sync updated images to Stripe
+    if let Some(stripe_product_id) = &product.stripe_product_id {
+        let image_urls: Vec<String> = images
+            .iter()
+            .map(|img| state.storage.public_url(&img.image_path))
+            .collect();
+
+        if let Err(e) = state.stripe.update_product(stripe_product_id, None, None, Some(image_urls)).await {
+            tracing::warn!("Failed to sync images after delete to Stripe: {}", e);
         }
     }
 
     Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
-/// Helper to sync all product images to Polar
-async fn sync_product_images_to_polar(
+/// Helper to sync all product images to Stripe (Stripe just takes URLs)
+async fn sync_product_images_to_stripe(
     state: &AppState,
     product: &Product,
     images: &[ProductImage],
 ) -> AppResult<()> {
-    let polar_product_id = match &product.polar_product_id {
+    let stripe_product_id = match &product.stripe_product_id {
         Some(id) => id,
         None => return Ok(()),
     };
 
-    if images.is_empty() {
-        // Clear all media from Polar product
-        state.polar.set_product_media(polar_product_id, vec![]).await?;
-        return Ok(());
-    }
+    // Stripe products accept image URLs directly
+    let image_urls: Vec<String> = images
+        .iter()
+        .map(|img| state.storage.public_url(&img.image_path))
+        .collect();
 
-    // Download and upload each image to Polar
-    let client = reqwest::Client::new();
-    let mut file_ids = Vec::new();
-
-    for image in images {
-        let image_url = state.storage.public_url(&image.image_path);
-
-        // Download image
-        let response = match client.get(&image_url).send().await {
-            Ok(r) if r.status().is_success() => r,
-            _ => continue,
-        };
-
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("image/jpeg")
-            .to_string();
-
-        let data = match response.bytes().await {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
-
-        let filename = image.image_path.rsplit('/').next().unwrap_or("image.jpg");
-
-        match state.polar.upload_file(filename, &content_type, &data).await {
-            Ok(file_id) => file_ids.push(file_id),
-            Err(e) => tracing::warn!("Failed to upload {} to Polar: {}", filename, e),
-        }
-    }
-
-    // Set all media on the product
-    state.polar.set_product_media(polar_product_id, file_ids).await?;
+    state.stripe.update_product(stripe_product_id, None, None, Some(image_urls)).await?;
     Ok(())
 }
 
@@ -619,7 +701,7 @@ pub struct SyncResponse {
     pub message: String,
 }
 
-async fn sync_to_polar(
+async fn sync_to_stripe(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<SyncResponse>> {
@@ -630,80 +712,33 @@ async fn sync_to_polar(
         .await?
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
-    // Check if product has Polar ID
-    let polar_product_id = product.polar_product_id.ok_or_else(|| {
-        AppError::BadRequest("Product not linked to Polar".to_string())
+    // Check if product has Stripe ID
+    let stripe_product_id = product.stripe_product_id.clone().ok_or_else(|| {
+        AppError::BadRequest("Product not linked to Stripe".to_string())
     })?;
 
     // Get all images for product
     let images = ProductImage::list_by_product(&conn, &id).await?;
 
-    if images.is_empty() {
-        return Ok(Json(SyncResponse {
-            success: true,
-            synced_count: 0,
-            message: "No images to sync".to_string(),
-        }));
-    }
+    // Stripe products accept image URLs directly (max 8 images)
+    let image_urls: Vec<String> = images
+        .iter()
+        .take(8) // Stripe allows max 8 images
+        .map(|img| state.storage.public_url(&img.image_path))
+        .collect();
 
-    // Upload each image and collect file IDs
-    let client = reqwest::Client::new();
-    let mut file_ids = Vec::new();
-
-    for image in &images {
-        let image_url = state.storage.public_url(&image.image_path);
-
-        // Download image
-        let response = client.get(&image_url).send().await.map_err(|e| {
-            AppError::ExternalService(format!("Failed to download image: {}", e))
-        })?;
-
-        if !response.status().is_success() {
-            tracing::warn!("Failed to download image {}: {}", image_url, response.status());
-            continue;
-        }
-
-        let content_type = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("image/jpeg")
-            .to_string();
-
-        let data = response.bytes().await.map_err(|e| {
-            AppError::ExternalService(format!("Failed to read image data: {}", e))
-        })?;
-
-        // Extract filename from path
-        let filename = image.image_path.rsplit('/').next().unwrap_or("image.jpg");
-
-        // Upload to Polar
-        match state.polar.upload_file(filename, &content_type, &data).await {
-            Ok(file_id) => {
-                file_ids.push(file_id);
-                tracing::info!("Uploaded {} to Polar", filename);
-            }
-            Err(e) => {
-                tracing::warn!("Failed to upload {} to Polar: {}", filename, e);
-            }
-        }
-    }
-
-    if file_ids.is_empty() {
-        return Ok(Json(SyncResponse {
-            success: false,
-            synced_count: 0,
-            message: "Failed to upload any images".to_string(),
-        }));
-    }
-
-    // Set all media on the product at once
-    state.polar.set_product_media(&polar_product_id, file_ids.clone()).await?;
+    // Update product with images
+    state.stripe.update_product(
+        &stripe_product_id,
+        Some(&product.name),
+        product.description.as_deref(),
+        Some(image_urls.clone()),
+    ).await?;
 
     Ok(Json(SyncResponse {
         success: true,
-        synced_count: file_ids.len(),
-        message: format!("Synced {} images to Polar", file_ids.len()),
+        synced_count: image_urls.len(),
+        message: format!("Synced {} images to Stripe", image_urls.len()),
     }))
 }
 

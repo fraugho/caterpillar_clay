@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::middleware::AuthUser;
-use crate::models::{CreateOrder, CreateOrderItem, Order, Product, ShippingAddress};
+use crate::models::{CreateOrder, CreateOrderItem, Order, Product, ProductImage, ShippingAddress};
 use crate::routes::AppState;
+use crate::services::stripe::CheckoutItem;
 
 #[derive(Deserialize)]
 pub struct CartItem {
@@ -76,44 +77,66 @@ async fn create_checkout(
         });
     }
 
-    // Create order in pending state
+    // Build checkout items with product details
+    let mut checkout_items: Vec<CheckoutItem> = Vec::new();
+    for item in &payload.items {
+        let product = Product::find_by_id(&conn, &item.product_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Product {} not found", item.product_id)))?;
+
+        // Get product images for checkout display
+        let images = ProductImage::list_by_product(&conn, &item.product_id).await?;
+        let image_urls: Vec<String> = images
+            .iter()
+            .take(1) // Stripe checkout shows one image per line item
+            .map(|img| {
+                if img.image_path.starts_with("http") {
+                    img.image_path.clone()
+                } else {
+                    state.storage.public_url(&img.image_path)
+                }
+            })
+            .collect();
+
+        checkout_items.push(CheckoutItem {
+            name: product.name.clone(),
+            description: product.description.clone(),
+            images: if image_urls.is_empty() { None } else { Some(image_urls) },
+            price_cents: product.price_cents as i64,
+            quantity: item.quantity,
+        });
+    }
+
+    // Create order in pending state (without session ID initially)
     let order = Order::create(
         &conn,
         CreateOrder {
             user_id: Some(user.id.clone()),
             total_cents,
             shipping_address: payload.shipping_address,
-            polar_checkout_id: None,
+            stripe_session_id: None,
             items: order_items,
         },
     )
     .await?;
 
-    // Create Polar checkout session
+    // Create Stripe checkout session
     let success_url = format!("{}/orders/{}?success=true", state.config.base_url, order.id);
-
-    // Get the first product's polar_price_id for checkout
-    // Note: For multi-item orders, we use the first product's price as the checkout item
-    // The full order details are tracked in our database
-    let first_item = payload.items.first().unwrap();
-    let first_product = Product::find_by_id(&conn, &first_item.product_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
-
-    let polar_price_id = first_product.polar_price_id.ok_or_else(|| {
-        AppError::BadRequest("Product not configured for checkout. Please contact support.".to_string())
-    })?;
+    let cancel_url = format!("{}/cart?cancelled=true", state.config.base_url);
 
     let checkout = state
-        .polar
-        .create_checkout(
-            &polar_price_id,
+        .stripe
+        .create_checkout_session(
+            checkout_items,
             &success_url,
+            &cancel_url,
             Some(&user.email),
-            order.uuid().unwrap_or_default(),
-            user.id.parse().ok(),
+            &order.id,
         )
         .await?;
+
+    // Update order with Stripe session ID
+    Order::set_stripe_session(&conn, &order.id, &checkout.id).await?;
 
     Ok(Json(CheckoutResponse {
         checkout_url: checkout.url,

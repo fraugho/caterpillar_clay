@@ -25,3 +25,6 @@ rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustl
 sha2 = "0.10"
 base64 = "0.22"
 resend-rs = "0.8"
+async-stripe = { version = "0.39", default-features = false, features = ["runtime-tokio-hyper", "checkout", "products", "connect"] }
+hex = "0.4"
+hmac = "0.12"
