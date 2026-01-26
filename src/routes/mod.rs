@@ -54,7 +54,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .nest("/api", public_routes)
         .nest("/api", protected_routes)
-        .nest("/admin", admin_routes)
+        .nest("/gallium", admin_routes)
         .nest_service("/uploads", ServeDir::new(&state.config.upload_dir))
         .fallback_service(
             ServeDir::new("static").fallback(ServeFile::new("static/index.html"))

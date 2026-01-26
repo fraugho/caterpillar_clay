@@ -34,5 +34,5 @@ pub fn routes(db: Arc<Database>, testing_mode: bool) -> Router<AppState> {
 
     Router::new()
         .nest("/api", api_routes)
-        .fallback_service(ServeDir::new("static/admin"))
+        .fallback_service(ServeDir::new("static/gallium"))
 }

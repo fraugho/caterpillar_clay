@@ -698,7 +698,7 @@
 
                 async loadDashboard() {
                     try {
-                        const res = await fetch('/admin/api/dashboard');
+                        const res = await fetch('/gallium/api/dashboard');
                         this.dashboard = await res.json();
                     } catch (e) {
                         console.error('Failed to load dashboard:', e);
@@ -707,7 +707,7 @@
 
                 async loadSubscriberCount() {
                     try {
-                        const res = await fetch('/admin/api/newsletter/subscribers');
+                        const res = await fetch('/gallium/api/newsletter/subscribers');
                         const data = await res.json();
                         this.subscriberCount = data.count || 0;
                     } catch (e) {
@@ -820,7 +820,7 @@
                         console.log('Sending batch update:', JSON.stringify({ updates, send_emails: sendEmails }, null, 2));
 
                         // Send batch update to backend
-                        const res = await fetch('/admin/api/products-batch', {
+                        const res = await fetch('/gallium/api/products-batch', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -861,7 +861,7 @@
 
                 async loadProducts() {
                     try {
-                        const res = await fetch('/admin/api/products');
+                        const res = await fetch('/gallium/api/products');
                         this.products = await res.json();
                         // Store original state for change tracking
                         this.originalProducts = {};
@@ -876,7 +876,7 @@
 
                 async loadOrders() {
                     try {
-                        const res = await fetch('/admin/api/orders');
+                        const res = await fetch('/gallium/api/orders');
                         this.orders = await res.json();
                     } catch (e) {
                         console.error('Failed to load orders:', e);
@@ -954,7 +954,7 @@
                 async removeImage(idx, img) {
                     if (img.isExisting && this.editingProduct) {
                         try {
-                            await fetch(`/admin/api/products/${this.editingProduct.id}/images/${img.id}`, {
+                            await fetch(`/gallium/api/products/${this.editingProduct.id}/images/${img.id}`, {
                                 method: 'DELETE'
                             });
                         } catch (e) {
@@ -982,13 +982,13 @@
                         let productId = this.editingProduct?.id;
 
                         if (this.editingProduct) {
-                            await fetch(`/admin/api/products/${productId}`, {
+                            await fetch(`/gallium/api/products/${productId}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(productData)
                             });
                         } else {
-                            const res = await fetch('/admin/api/products', {
+                            const res = await fetch('/gallium/api/products', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(productData)
@@ -1001,7 +1001,7 @@
                         for (const file of this.newImages) {
                             const formData = new FormData();
                             formData.append('file', file);
-                            await fetch(`/admin/api/products/${productId}/images`, {
+                            await fetch(`/gallium/api/products/${productId}/images`, {
                                 method: 'POST',
                                 body: formData
                             });
@@ -1011,7 +1011,7 @@
                         if (this.editingProduct) {
                             const imageIds = this.productImages.filter(img => img.isExisting).map(img => img.id);
                             if (imageIds.length > 0) {
-                                await fetch(`/admin/api/products/${productId}/images/reorder`, {
+                                await fetch(`/gallium/api/products/${productId}/images/reorder`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ image_ids: imageIds })
@@ -1030,7 +1030,7 @@
 
                 async toggleProductActive(product) {
                     try {
-                        await fetch(`/admin/api/products/${product.id}`, {
+                        await fetch(`/gallium/api/products/${product.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ is_active: !product.is_active })
@@ -1044,7 +1044,7 @@
                 async deleteProduct(id) {
                     if (!confirm('Delete this product?')) return;
                     try {
-                        await fetch(`/admin/api/products/${id}`, { method: 'DELETE' });
+                        await fetch(`/gallium/api/products/${id}`, { method: 'DELETE' });
                         await this.loadProducts();
                     } catch (e) {
                         console.error('Failed to delete product:', e);
@@ -1058,7 +1058,7 @@
 
                 async updateOrderStatus(orderId, status) {
                     try {
-                        await fetch(`/admin/api/orders/${orderId}/status`, {
+                        await fetch(`/gallium/api/orders/${orderId}/status`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ status })
@@ -1077,7 +1077,7 @@
 
                 async saveTracking() {
                     try {
-                        await fetch(`/admin/api/orders/${this.trackingOrderId}/tracking`, {
+                        await fetch(`/gallium/api/orders/${this.trackingOrderId}/tracking`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(this.trackingForm)
@@ -1091,7 +1091,7 @@
 
                 async loadArtistSettings() {
                     try {
-                        const res = await fetch('/admin/api/settings/artist');
+                        const res = await fetch('/gallium/api/settings/artist');
                         const data = await res.json();
                         this.artistSettings = {
                             image: data.image,
@@ -1106,7 +1106,7 @@
 
                 async loadSiteSettings() {
                     try {
-                        const res = await fetch('/admin/api/settings/favicon');
+                        const res = await fetch('/gallium/api/settings/favicon');
                         const data = await res.json();
                         this.favicon = data.url;
                     } catch (e) {
@@ -1133,7 +1133,7 @@
                     try {
                         const formData = new FormData();
                         formData.append('file', this.faviconFile);
-                        const res = await fetch('/admin/api/settings/favicon', {
+                        const res = await fetch('/gallium/api/settings/favicon', {
                             method: 'PUT',
                             body: formData
                         });
@@ -1170,14 +1170,14 @@
                         if (this.artistSettings.newImageFile) {
                             const formData = new FormData();
                             formData.append('file', this.artistSettings.newImageFile);
-                            await fetch('/admin/api/settings/artist/image', {
+                            await fetch('/gallium/api/settings/artist/image', {
                                 method: 'PUT',
                                 body: formData
                             });
                         }
 
                         // Save description
-                        await fetch('/admin/api/settings/artist', {
+                        await fetch('/gallium/api/settings/artist', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ description: this.artistSettings.description })

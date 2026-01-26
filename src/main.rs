@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&addr).await?;
 
     tracing::info!("Server listening on {}", addr);
-    tracing::info!("Admin panel: {}/admin/", config.base_url);
+    tracing::info!("Admin panel: {}/gallium/", config.base_url);
 
     axum::serve(listener, app).await?;
 

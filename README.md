@@ -22,6 +22,7 @@ Recent changes to get you up to speed:
 | **Notify Me** | Out-of-stock products show "Notify Me" button. Customers enter email for one-time restock alert. |
 | **Auto restock emails** | When admin restocks a product (0→positive), restock emails auto-send to all subscribers. |
 | **Admin batch editing** | Edit multiple products inline, review changes in modal, confirm before saving. |
+| **Hidden admin path** | Admin panel at `/gallium/` instead of `/admin/` (security through obscurity + one of Alex's favorite element). |
 
 ### Key Files to Know
 
@@ -29,7 +30,7 @@ Recent changes to get you up to speed:
 |------|---------|
 | `static/index.html` | Main storefront SPA (Alpine.js) |
 | `static/artist.html` | Artist bio page |
-| `static/admin/index.html` | Admin panel SPA |
+| `static/gallium/index.html` | Admin panel SPA |
 | `src/routes/admin/products.rs` | Admin product CRUD + Polar sync |
 | `src/routes/admin/settings.rs` | Admin artist settings API |
 | `src/routes/newsletter.rs` | Newsletter subscribe/unsubscribe API |
@@ -141,8 +142,8 @@ clay/
 ├── static/
 │   ├── index.html          # Main storefront
 │   ├── uploads/            # Product images
-│   └── admin/
-│       └── index.html      # Admin panel
+│   └── gallium/
+│       └── index.html      # Admin panel (hidden path)
 └── templates/emails/       # Email templates
 ```
 
@@ -333,7 +334,7 @@ The server will start on `http://localhost:3000`.
 - Browse products, add to cart, checkout (requires Clerk auth)
 
 ### Admin Panel
-- Open `http://localhost:3000/admin/`
+- Open `http://localhost:3000/gallium/` (hidden path - gallium is one of Alex's favorite element)
 - Requires admin user (set `is_admin = true` in database)
 - Or set `TESTING_MODE=true` in `.env` to bypass auth
 - Manage products, view orders, add tracking
@@ -386,25 +387,25 @@ curl -X POST http://localhost:3000/admin/api/products \
 ### Admin
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/admin/products` | All products with images |
-| POST | `/admin/products` | Create product (auto-syncs to Polar) |
-| GET | `/admin/products/:id` | Get single product |
-| PUT | `/admin/products/:id` | Update product (auto-syncs to Polar) |
-| DELETE | `/admin/products/:id` | Delete product (archives in Polar) |
-| POST | `/admin/products/:id/images` | Upload images (multipart, auto-syncs) |
-| PUT | `/admin/products/:id/images/reorder` | Reorder images |
-| DELETE | `/admin/products/:id/images/:image_id` | Delete image |
-| POST | `/admin/products/:id/sync-polar` | Manual Polar sync |
-| GET | `/admin/orders` | All orders |
-| PUT | `/admin/orders/:id/status` | Update status |
-| POST | `/admin/orders/:id/tracking` | Add tracking |
-| GET | `/admin/dashboard` | Stats overview |
-| GET | `/admin/settings/artist` | Get artist info |
-| PUT | `/admin/settings/artist` | Update artist description |
-| PUT | `/admin/settings/artist/image` | Upload artist image |
-| GET | `/admin/newsletter/subscribers` | Get subscriber count |
-| POST | `/admin/newsletter/notify/:product_id` | Send new product notification to all subscribers |
-| PUT | `/admin/products-batch` | Batch update multiple products (auto-sends restock emails) |
+| GET | `/gallium/products` | All products with images |
+| POST | `/gallium/products` | Create product (auto-syncs to Polar) |
+| GET | `/gallium/products/:id` | Get single product |
+| PUT | `/gallium/products/:id` | Update product (auto-syncs to Polar) |
+| DELETE | `/gallium/products/:id` | Delete product (archives in Polar) |
+| POST | `/gallium/products/:id/images` | Upload images (multipart, auto-syncs) |
+| PUT | `/gallium/products/:id/images/reorder` | Reorder images |
+| DELETE | `/gallium/products/:id/images/:image_id` | Delete image |
+| POST | `/gallium/products/:id/sync-polar` | Manual Polar sync |
+| GET | `/gallium/orders` | All orders |
+| PUT | `/gallium/orders/:id/status` | Update status |
+| POST | `/gallium/orders/:id/tracking` | Add tracking |
+| GET | `/gallium/dashboard` | Stats overview |
+| GET | `/gallium/settings/artist` | Get artist info |
+| PUT | `/gallium/settings/artist` | Update artist description |
+| PUT | `/gallium/settings/artist/image` | Upload artist image |
+| GET | `/gallium/newsletter/subscribers` | Get subscriber count |
+| POST | `/gallium/newsletter/notify/:product_id` | Send new product notification to all subscribers |
+| PUT | `/gallium/products-batch` | Batch update multiple products (auto-sends restock emails) |
 
 ### Webhooks
 | Method | Endpoint | Description |
