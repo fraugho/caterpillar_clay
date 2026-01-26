@@ -263,7 +263,7 @@
                                 <div>
                                     <h4 x-text="p.name"></h4>
                                     <div class="price">$<span x-text="p.price.toFixed(2)"></span></div>
-                                    <div class="stock" x-text="p.stock_quantity > 0 ? 'In Stock (' + p.stock_quantity + ')' : 'Out of Stock'"></div>
+                                    <div class="stock" x-text="getStockDisplay(p)"></div>
                                 </div>
                             </template>
                             <template x-if="editing">
@@ -293,6 +293,7 @@
                             <div class="product-actions" style="flex-wrap:wrap">
                                 <button class="btn btn-sm" @click="editing = !editing" x-text="editing ? 'DONE' : 'EDIT'"></button>
                                 <button class="btn btn-sm" @click="editProduct(p)">IMAGES</button>
+                                <button class="btn btn-sm" @click="openStylesModal(p)">STYLES</button>
                                 <button class="btn btn-sm btn-danger" @click="deleteProduct(p.id)">DELETE</button>
                             </div>
                         </div>
@@ -623,6 +624,125 @@
         </div>
     </div>
 
+    <!-- Styles Modal -->
+    <div class="modal" :class="{ active: showStylesModal }">
+        <div class="modal-content" style="max-width:700px">
+            <div class="modal-header">
+                <h3 x-text="stylesProduct ? 'STYLES: ' + stylesProduct.name : 'STYLES'"></h3>
+                <button class="close-btn" @click="showStylesModal = false">&times;</button>
+            </div>
+
+            <template x-if="stylesProduct">
+                <div>
+                    <!-- Add New Style -->
+                    <div style="background:var(--bg-secondary);padding:16px;border-radius:8px;margin-bottom:20px;border:2px solid var(--border)">
+                        <h4 style="font-size:10px;color:var(--accent);margin-bottom:12px">ADD NEW STYLE</h4>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                            <!-- Form fields -->
+                            <div>
+                                <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px">
+                                    <div>
+                                        <label style="font-size:6px">Name</label>
+                                        <input type="text" x-model="newStyleName" placeholder="e.g., Small Caterpillar" style="margin-bottom:0">
+                                    </div>
+                                    <div>
+                                        <label style="font-size:6px">Stock</label>
+                                        <input type="number" x-model.number="newStyleStock" style="margin-bottom:0">
+                                    </div>
+                                </div>
+                                <label style="font-size:6px">Select Image (click to choose)</label>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:6px;margin-bottom:12px;max-height:120px;overflow-y:auto;padding:4px">
+                                    <!-- No image option -->
+                                    <div @click="newStyleImageId = ''" style="width:50px;height:50px;background:var(--bg-primary);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--border)" :style="{ borderColor: !newStyleImageId ? 'var(--accent)' : 'var(--border)' }">
+                                        <span style="font-size:6px;color:var(--text-secondary)">None</span>
+                                    </div>
+                                    <template x-for="(img, idx) in stylesProduct.images" :key="img.id">
+                                        <div @click="newStyleImageId = img.id" style="width:50px;height:50px;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid var(--border);position:relative" :style="{ borderColor: newStyleImageId === img.id ? 'var(--accent)' : 'var(--border)' }">
+                                            <img :src="img.image_url" style="width:100%;height:100%;object-fit:cover">
+                                            <span style="position:absolute;bottom:1px;right:1px;background:rgba(0,0,0,0.7);color:#fff;font-size:5px;padding:1px 3px;border-radius:2px" x-text="idx + 1"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                                <button class="btn" style="width:100%" @click="addStyle()" :disabled="!newStyleName.trim() || savingStyle">ADD STYLE</button>
+                            </div>
+                            <!-- Image Preview -->
+                            <div style="display:flex;align-items:center;justify-content:center;background:var(--bg-primary);border-radius:8px;border:2px solid var(--border);min-height:150px;padding:8px">
+                                <template x-if="getImageUrlById(newStyleImageId)">
+                                    <img :src="getImageUrlById(newStyleImageId)" style="max-width:100%;max-height:200px;object-fit:contain;border-radius:6px">
+                                </template>
+                                <template x-if="!getImageUrlById(newStyleImageId)">
+                                    <span style="font-size:8px;color:var(--text-secondary);text-align:center">Select an image<br>to preview</span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Existing Styles -->
+                    <template x-if="stylesProduct.styles && stylesProduct.styles.length > 0">
+                        <div>
+                            <h4 style="font-size:10px;color:var(--accent);margin-bottom:12px">EXISTING STYLES (<span x-text="stylesProduct.styles.length"></span>) - Total: <span x-text="stylesProduct.styles.reduce((sum, s) => sum + (s.stock_quantity || 0), 0)"></span> <span style="font-size:7px;color:var(--text-secondary)">(drag to reorder)</span></h4>
+                            <template x-for="(style, styleIdx) in stylesProduct.styles" :key="style.id">
+                                <div x-data="{ showImagePicker: false }"
+                                     draggable="true"
+                                     @dragstart="styleDragIdx = styleIdx"
+                                     @dragend="styleDragIdx = null; styleDragOverIdx = null"
+                                     @dragover.prevent="styleDragOverIdx = styleIdx"
+                                     @dragleave="if(styleDragOverIdx === styleIdx) styleDragOverIdx = null"
+                                     @drop.prevent="handleStyleDrop(styleIdx)"
+                                     style="background:var(--bg-secondary);padding:12px;margin-bottom:8px;border-radius:8px;border:2px solid var(--border);cursor:grab;transition:opacity 0.2s, border-color 0.2s"
+                                     :style="{ opacity: styleDragIdx === styleIdx ? 0.5 : 1, borderColor: styleDragOverIdx === styleIdx ? 'var(--accent)' : 'var(--border)', borderStyle: styleDragOverIdx === styleIdx ? 'dashed' : 'solid' }">
+                                    <div style="display:grid;grid-template-columns:24px 60px 2fr 80px auto auto;gap:12px;align-items:center">
+                                        <!-- Drag handle -->
+                                        <div style="font-size:12px;color:var(--text-secondary);cursor:grab;text-align:center">⋮⋮</div>
+                                        <!-- Image preview thumbnail - clickable to change -->
+                                        <div @click="showImagePicker = !showImagePicker" style="width:60px;height:60px;background:var(--bg-primary);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:2px solid var(--border);cursor:pointer" :style="{ borderColor: showImagePicker ? 'var(--accent)' : 'var(--border)' }">
+                                            <template x-if="getImageUrlById(style.image_id)">
+                                                <img :src="getImageUrlById(style.image_id)" style="width:100%;height:100%;object-fit:cover">
+                                            </template>
+                                            <template x-if="!getImageUrlById(style.image_id)">
+                                                <span style="font-size:6px;color:var(--text-secondary);text-align:center">Click to<br>select</span>
+                                            </template>
+                                        </div>
+                                        <input type="text" x-model="style.name" style="margin-bottom:0" @change="updateStyle(style)">
+                                        <input type="number" x-model.number="style.stock_quantity" style="margin-bottom:0" @change="updateStyle(style)">
+                                        <span :style="{ color: style.stock_quantity > 0 ? '#22c55e' : '#ef4444' }" style="font-size:8px;white-space:nowrap" x-text="style.stock_quantity > 0 ? 'In Stock' : 'Out'"></span>
+                                        <button class="btn btn-sm btn-danger" @click="deleteStyle(style.id)">X</button>
+                                    </div>
+                                    <!-- Image picker grid -->
+                                    <template x-if="showImagePicker">
+                                        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+                                            <p style="font-size:8px;color:var(--text-secondary);margin-bottom:8px">Select an image:</p>
+                                            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:8px">
+                                                <!-- No image option -->
+                                                <div @click="style.image_id = ''; updateStyle(style); showImagePicker = false" style="width:60px;height:60px;background:var(--bg-primary);border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--border)" :style="{ borderColor: !style.image_id ? 'var(--accent)' : 'var(--border)' }">
+                                                    <span style="font-size:6px;color:var(--text-secondary)">None</span>
+                                                </div>
+                                                <template x-for="(img, idx) in stylesProduct.images" :key="img.id">
+                                                    <div @click="style.image_id = img.id; updateStyle(style); showImagePicker = false" style="width:60px;height:60px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid var(--border);position:relative" :style="{ borderColor: style.image_id === img.id ? 'var(--accent)' : 'var(--border)' }">
+                                                        <img :src="img.image_url" style="width:100%;height:100%;object-fit:cover">
+                                                        <span style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.7);color:#fff;font-size:6px;padding:1px 4px;border-radius:2px" x-text="idx + 1"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template x-if="!stylesProduct.styles || stylesProduct.styles.length === 0">
+                        <p style="font-size:10px;color:var(--text-secondary);text-align:center;padding:20px">No styles yet. Add one above.</p>
+                    </template>
+                </div>
+            </template>
+
+            <div style="margin-top:20px">
+                <button class="btn" style="width:100%" @click="showStylesModal = false">DONE</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Generate pixel stars
         (function generateStars(){
@@ -672,6 +792,15 @@
                 faviconPreview: null,
                 faviconFile: null,
                 savingFavicon: false,
+                // Styles modal
+                showStylesModal: false,
+                stylesProduct: null,
+                newStyleName: '',
+                newStyleStock: 0,
+                newStyleImageId: '',
+                savingStyle: false,
+                styleDragIdx: null,
+                styleDragOverIdx: null,
 
                 async init() {
                     // Always load subscriber count for notifications
@@ -859,6 +988,26 @@
                     }
                 },
 
+                getStockDisplay(product) {
+                    // If product has styles, sum up the style quantities
+                    if (product.styles && product.styles.length > 0) {
+                        const totalStock = product.styles.reduce((sum, s) => sum + (s.stock_quantity || 0), 0);
+                        return totalStock > 0 ? `In Stock (${totalStock})` : 'Out of Stock';
+                    }
+                    // Otherwise use the product's stock_quantity
+                    return product.stock_quantity > 0 ? `In Stock (${product.stock_quantity})` : 'Out of Stock';
+                },
+
+                getImageById(imageId) {
+                    if (!imageId || !this.stylesProduct || !this.stylesProduct.images) return null;
+                    return this.stylesProduct.images.find(i => i.id === imageId);
+                },
+
+                getImageUrlById(imageId) {
+                    const img = this.getImageById(imageId);
+                    return img ? img.image_url : null;
+                },
+
                 async loadProducts() {
                     try {
                         const res = await fetch('/gallium/api/products');
@@ -906,6 +1055,121 @@
                     }));
                     this.newImages = [];
                     this.showProductModal = true;
+                },
+
+                openStylesModal(product) {
+                    this.stylesProduct = product;
+                    this.newStyleName = '';
+                    this.newStyleStock = 0;
+                    this.newStyleImageId = '';
+                    this.showStylesModal = true;
+                },
+
+                async addStyle() {
+                    if (!this.newStyleName.trim() || !this.stylesProduct) return;
+                    this.savingStyle = true;
+                    try {
+                        const res = await fetch(`/gallium/api/products/${this.stylesProduct.id}/styles`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.newStyleName.trim(),
+                                stock_quantity: this.newStyleStock || 0,
+                                image_id: this.newStyleImageId || null
+                            })
+                        });
+                        const updated = await res.json();
+                        // Update the product in our list
+                        const idx = this.products.findIndex(p => p.id === this.stylesProduct.id);
+                        if (idx !== -1) {
+                            this.products[idx] = updated;
+                            this.stylesProduct = updated;
+                        }
+                        this.newStyleName = '';
+                        this.newStyleStock = 0;
+                        this.newStyleImageId = '';
+                        this.showToast('Style added');
+                    } catch (e) {
+                        console.error('Failed to add style:', e);
+                        this.showToast('Failed to add style', 'error');
+                    } finally {
+                        this.savingStyle = false;
+                    }
+                },
+
+                async updateStyle(style) {
+                    if (!this.stylesProduct) return;
+                    try {
+                        const res = await fetch(`/gallium/api/products/${this.stylesProduct.id}/styles/${style.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: style.name,
+                                stock_quantity: style.stock_quantity || 0,
+                                image_id: style.image_id || null
+                            })
+                        });
+                        const updated = await res.json();
+                        const idx = this.products.findIndex(p => p.id === this.stylesProduct.id);
+                        if (idx !== -1) {
+                            this.products[idx] = updated;
+                            this.stylesProduct = updated;
+                        }
+                    } catch (e) {
+                        console.error('Failed to update style:', e);
+                        this.showToast('Failed to update style', 'error');
+                    }
+                },
+
+                async deleteStyle(styleId) {
+                    if (!this.stylesProduct || !confirm('Delete this style?')) return;
+                    try {
+                        const res = await fetch(`/gallium/api/products/${this.stylesProduct.id}/styles/${styleId}`, {
+                            method: 'DELETE'
+                        });
+                        const updated = await res.json();
+                        const idx = this.products.findIndex(p => p.id === this.stylesProduct.id);
+                        if (idx !== -1) {
+                            this.products[idx] = updated;
+                            this.stylesProduct = updated;
+                        }
+                        this.showToast('Style deleted');
+                    } catch (e) {
+                        console.error('Failed to delete style:', e);
+                        this.showToast('Failed to delete style', 'error');
+                    }
+                },
+
+                async handleStyleDrop(targetIdx) {
+                    if (this.styleDragIdx === null || this.styleDragIdx === targetIdx || !this.stylesProduct) return;
+
+                    // Reorder locally first for instant feedback
+                    const styles = [...this.stylesProduct.styles];
+                    const [moved] = styles.splice(this.styleDragIdx, 1);
+                    styles.splice(targetIdx, 0, moved);
+                    this.stylesProduct.styles = styles;
+
+                    // Send reorder request to server
+                    const styleIds = styles.map(s => s.id);
+                    try {
+                        const res = await fetch(`/gallium/api/products/${this.stylesProduct.id}/styles/reorder`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ style_ids: styleIds })
+                        });
+                        const updated = await res.json();
+                        const idx = this.products.findIndex(p => p.id === this.stylesProduct.id);
+                        if (idx !== -1) {
+                            this.products[idx] = updated;
+                            this.stylesProduct = updated;
+                        }
+                    } catch (e) {
+                        console.error('Failed to reorder styles:', e);
+                        this.showToast('Failed to reorder styles', 'error');
+                    }
+
+                    this.styleDragIdx = null;
+                    this.styleDragOverIdx = null;
                 },
 
                 handleImageSelect(event) {

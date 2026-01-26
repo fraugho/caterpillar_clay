@@ -129,4 +129,55 @@ impl StorageBackend for R2Storage {
             format!("{}{}", self.public_url, path)
         }
     }
+
+    async fn get_object(&self, path: &str) -> Result<Vec<u8>, StorageError> {
+        let path = path.trim_start_matches('/');
+
+        let response = self
+            .bucket
+            .get_object(path)
+            .await
+            .map_err(|e| StorageError::UploadFailed(format!("Failed to get object: {}", e)))?;
+
+        Ok(response.to_vec())
+    }
+
+    async fn move_object(&self, from_path: &str, to_folder: &str) -> Result<String, StorageError> {
+        let from_path = from_path.trim_start_matches('/');
+
+        // Get filename from the original path
+        let filename = from_path
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| StorageError::UploadFailed("Invalid path".to_string()))?;
+
+        // Construct new path
+        let new_path = format!("uploads/{}/{}", to_folder, filename);
+
+        // If source and destination are the same, just return
+        if from_path == new_path {
+            return Ok(format!("/{}", new_path));
+        }
+
+        // Get the object data
+        let data = self.get_object(from_path).await?;
+
+        // Determine content type from extension
+        let extension = filename.rsplit('.').next().unwrap_or("bin");
+        let content_type = Self::get_content_type(extension);
+
+        // Upload to new location
+        self.bucket
+            .put_object_with_content_type(&new_path, &data, content_type)
+            .await
+            .map_err(|e| StorageError::UploadFailed(e.to_string()))?;
+
+        // Delete from old location
+        self.bucket
+            .delete_object(from_path)
+            .await
+            .map_err(|e| StorageError::DeleteFailed(e.to_string()))?;
+
+        Ok(format!("/{}", new_path))
+    }
 }

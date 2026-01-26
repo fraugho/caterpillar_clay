@@ -90,4 +90,34 @@ impl StorageBackend for LocalStorage {
             format!("{}{}", self.base_url, path)
         }
     }
+
+    async fn get_object(&self, path: &str) -> Result<Vec<u8>, StorageError> {
+        let filename = path.trim_start_matches("/uploads/");
+        let file_path = self.upload_dir.join(filename);
+        fs::read(&file_path).await.map_err(StorageError::from)
+    }
+
+    async fn move_object(&self, from_path: &str, to_folder: &str) -> Result<String, StorageError> {
+        let from_filename = from_path.trim_start_matches("/uploads/");
+        let filename = from_filename
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| StorageError::UploadFailed("Invalid path".to_string()))?;
+
+        let new_relative_path = format!("{}/{}", to_folder, filename);
+        let new_full_path = format!("/uploads/{}", new_relative_path);
+
+        // If source and destination are same, just return
+        if format!("/uploads/{}", from_filename) == new_full_path {
+            return Ok(new_full_path);
+        }
+
+        let from_file = self.upload_dir.join(from_filename);
+        let to_dir = self.ensure_subdir(to_folder).await?;
+        let to_file = to_dir.join(filename);
+
+        fs::rename(&from_file, &to_file).await?;
+
+        Ok(new_full_path)
+    }
 }

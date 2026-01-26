@@ -6,8 +6,23 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
-use crate::models::{CreateProduct, Product, ProductImage, ProductNotification, UpdateProduct};
+use crate::models::{CreateProduct, Product, ProductImage, ProductNotification, ProductStyle, UpdateProduct};
 use crate::routes::AppState;
+
+/// Sanitize a style name for use in folder paths
+fn sanitize_style_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c.to_ascii_lowercase()
+            } else if c == ' ' {
+                '-'
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
 
 #[derive(Serialize)]
 pub struct ImageResponse {
@@ -18,6 +33,15 @@ pub struct ImageResponse {
 }
 
 #[derive(Serialize)]
+pub struct AdminStyleResponse {
+    pub id: String,
+    pub name: String,
+    pub stock_quantity: i64,
+    pub image_id: Option<String>,
+    pub sort_order: i64,
+}
+
+#[derive(Serialize)]
 pub struct AdminProductResponse {
     pub id: String,
     pub name: String,
@@ -25,6 +49,7 @@ pub struct AdminProductResponse {
     pub price_cents: i32,
     pub price: f64,
     pub images: Vec<ImageResponse>,
+    pub styles: Vec<AdminStyleResponse>,
     pub stock_quantity: i32,
     pub is_active: bool,
     pub polar_product_id: Option<String>,
@@ -34,7 +59,12 @@ pub struct AdminProductResponse {
 }
 
 impl AdminProductResponse {
-    fn from_product(product: Product, images: Vec<ProductImage>, state: &AppState) -> Self {
+    fn from_product(
+        product: Product,
+        images: Vec<ProductImage>,
+        styles: Vec<ProductStyle>,
+        state: &AppState,
+    ) -> Self {
         let image_responses: Vec<ImageResponse> = images
             .into_iter()
             .map(|img| {
@@ -52,6 +82,17 @@ impl AdminProductResponse {
             })
             .collect();
 
+        let style_responses: Vec<AdminStyleResponse> = styles
+            .into_iter()
+            .map(|style| AdminStyleResponse {
+                id: style.id,
+                name: style.name,
+                stock_quantity: style.stock_quantity,
+                image_id: style.image_id,
+                sort_order: style.sort_order,
+            })
+            .collect();
+
         Self {
             id: product.id,
             name: product.name,
@@ -59,6 +100,7 @@ impl AdminProductResponse {
             price_cents: product.price_cents,
             price: product.price_cents as f64 / 100.0,
             images: image_responses,
+            styles: style_responses,
             stock_quantity: product.stock_quantity,
             is_active: product.is_active,
             polar_product_id: product.polar_product_id,
@@ -72,6 +114,25 @@ impl AdminProductResponse {
 #[derive(Deserialize)]
 pub struct ReorderImagesRequest {
     pub image_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateStyleRequest {
+    pub name: String,
+    pub stock_quantity: i64,
+    pub image_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateStyleRequest {
+    pub name: String,
+    pub stock_quantity: i64,
+    pub image_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ReorderStylesRequest {
+    pub style_ids: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -111,6 +172,11 @@ pub fn routes() -> Router<AppState> {
         .route("/products/{id}/images/reorder", put(reorder_images))
         .route("/products/{id}/images/{image_id}", delete(delete_image))
         .route("/products/{id}/sync-polar", post(sync_to_polar))
+        // Style routes
+        .route("/products/{id}/styles", post(create_style))
+        .route("/products/{id}/styles/reorder", put(reorder_styles))
+        .route("/products/{id}/styles/{style_id}", put(update_style))
+        .route("/products/{id}/styles/{style_id}", delete(delete_style))
 }
 
 async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<AdminProductResponse>>> {
@@ -120,7 +186,8 @@ async fn list_products(State(state): State<AppState>) -> AppResult<Json<Vec<Admi
     let mut responses = Vec::new();
     for product in products {
         let images = ProductImage::list_by_product(&conn, &product.id).await?;
-        responses.push(AdminProductResponse::from_product(product, images, &state));
+        let styles = ProductStyle::get_by_product(&conn, &product.id).await?;
+        responses.push(AdminProductResponse::from_product(product, images, styles, &state));
     }
 
     Ok(Json(responses))
@@ -218,8 +285,9 @@ async fn get_product(
         .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
 
     let images = ProductImage::list_by_product(&conn, &id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
-    Ok(Json(AdminProductResponse::from_product(product, images, &state)))
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
 async fn create_product(
@@ -249,7 +317,7 @@ async fn create_product(
         }
     }
 
-    Ok(Json(AdminProductResponse::from_product(product, vec![], &state)))
+    Ok(Json(AdminProductResponse::from_product(product, vec![], vec![], &state)))
 }
 
 async fn update_product(
@@ -322,8 +390,9 @@ async fn update_product(
     }
 
     let images = ProductImage::list_by_product(&conn, &id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
-    Ok(Json(AdminProductResponse::from_product(product, images, &state)))
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
 async fn delete_product(
@@ -415,6 +484,7 @@ async fn upload_image(
     }
 
     let images = ProductImage::list_by_product(&conn, &id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
     // Sync all images to Polar if product is linked
     if product.polar_product_id.is_some() {
@@ -423,7 +493,7 @@ async fn upload_image(
         }
     }
 
-    Ok(Json(AdminProductResponse::from_product(product, images, &state)))
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
 async fn reorder_images(
@@ -442,6 +512,7 @@ async fn reorder_images(
     ProductImage::reorder(&conn, &id, &payload.image_ids).await?;
 
     let images = ProductImage::list_by_product(&conn, &id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &id).await?;
 
     // Sync reordered images to Polar
     if product.polar_product_id.is_some() {
@@ -450,7 +521,7 @@ async fn reorder_images(
         }
     }
 
-    Ok(Json(AdminProductResponse::from_product(product, images, &state)))
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
 async fn delete_image(
@@ -474,6 +545,7 @@ async fn delete_image(
     ProductImage::delete(&conn, &image_id).await?;
 
     let images = ProductImage::list_by_product(&conn, &product_id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
 
     // Sync updated images to Polar
     if product.polar_product_id.is_some() {
@@ -482,7 +554,7 @@ async fn delete_image(
         }
     }
 
-    Ok(Json(AdminProductResponse::from_product(product, images, &state)))
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }
 
 /// Helper to sync all product images to Polar
@@ -633,4 +705,167 @@ async fn sync_to_polar(
         synced_count: file_ids.len(),
         message: format!("Synced {} images to Polar", file_ids.len()),
     }))
+}
+
+// Style CRUD handlers
+
+async fn create_style(
+    State(state): State<AppState>,
+    Path(product_id): Path<String>,
+    Json(payload): Json<CreateStyleRequest>,
+) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    // Verify product exists
+    let product = Product::find_by_id(&conn, &product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // If an image is being linked, move it to the style folder
+    if let Some(ref image_id) = payload.image_id {
+        if let Some(image) = ProductImage::find_by_id(&conn, image_id).await? {
+            let style_folder = format!("{}/{}", product_id, sanitize_style_name(&payload.name));
+            match state.storage.move_object(&image.image_path, &style_folder).await {
+                Ok(new_path) => {
+                    ProductImage::update_path(&conn, image_id, &new_path).await?;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to move image to style folder: {}", e);
+                }
+            }
+        }
+    }
+
+    // Create the style
+    ProductStyle::create(
+        &conn,
+        &product_id,
+        &payload.name,
+        payload.stock_quantity,
+        payload.image_id.as_deref(),
+    )
+    .await?;
+
+    let images = ProductImage::list_by_product(&conn, &product_id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
+
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
+}
+
+async fn update_style(
+    State(state): State<AppState>,
+    Path((product_id, style_id)): Path<(String, String)>,
+    Json(payload): Json<UpdateStyleRequest>,
+) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    // Verify product exists
+    let product = Product::find_by_id(&conn, &product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // Verify style exists and belongs to this product
+    let style = ProductStyle::get_by_id(&conn, &style_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Style not found".to_string()))?;
+
+    if style.product_id != product_id {
+        return Err(AppError::BadRequest("Style does not belong to this product".to_string()));
+    }
+
+    // If an image is being linked (new or changed), move it to the style folder
+    if let Some(ref image_id) = payload.image_id {
+        // Only move if the image is different from the current one
+        if style.image_id.as_ref() != Some(image_id) {
+            if let Some(image) = ProductImage::find_by_id(&conn, image_id).await? {
+                let style_folder = format!("{}/{}", product_id, sanitize_style_name(&payload.name));
+                match state.storage.move_object(&image.image_path, &style_folder).await {
+                    Ok(new_path) => {
+                        ProductImage::update_path(&conn, image_id, &new_path).await?;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to move image to style folder: {}", e);
+                    }
+                }
+            }
+        } else if style.name != payload.name {
+            // Image is the same but name changed - move image to new folder name
+            if let Some(image) = ProductImage::find_by_id(&conn, image_id).await? {
+                let style_folder = format!("{}/{}", product_id, sanitize_style_name(&payload.name));
+                match state.storage.move_object(&image.image_path, &style_folder).await {
+                    Ok(new_path) => {
+                        ProductImage::update_path(&conn, image_id, &new_path).await?;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to move image to new style folder: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    // Update the style
+    ProductStyle::update(
+        &conn,
+        &style_id,
+        &payload.name,
+        payload.stock_quantity,
+        payload.image_id.as_deref(),
+    )
+    .await?;
+
+    let images = ProductImage::list_by_product(&conn, &product_id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
+
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
+}
+
+async fn delete_style(
+    State(state): State<AppState>,
+    Path((product_id, style_id)): Path<(String, String)>,
+) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    // Verify product exists
+    let product = Product::find_by_id(&conn, &product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // Verify style exists and belongs to this product
+    let style = ProductStyle::get_by_id(&conn, &style_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Style not found".to_string()))?;
+
+    if style.product_id != product_id {
+        return Err(AppError::BadRequest("Style does not belong to this product".to_string()));
+    }
+
+    // Delete the style
+    ProductStyle::delete(&conn, &style_id).await?;
+
+    let images = ProductImage::list_by_product(&conn, &product_id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
+
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
+}
+
+async fn reorder_styles(
+    State(state): State<AppState>,
+    Path(product_id): Path<String>,
+    Json(payload): Json<ReorderStylesRequest>,
+) -> AppResult<Json<AdminProductResponse>> {
+    let conn = state.db.connect().map_err(AppError::from)?;
+
+    // Verify product exists
+    let product = Product::find_by_id(&conn, &product_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Product not found".to_string()))?;
+
+    // Reorder styles
+    ProductStyle::reorder(&conn, &product_id, &payload.style_ids).await?;
+
+    let images = ProductImage::list_by_product(&conn, &product_id).await?;
+    let styles = ProductStyle::get_by_product(&conn, &product_id).await?;
+
+    Ok(Json(AdminProductResponse::from_product(product, images, styles, &state)))
 }

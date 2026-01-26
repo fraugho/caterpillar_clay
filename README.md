@@ -23,6 +23,10 @@ Recent changes to get you up to speed:
 | **Auto restock emails** | When admin restocks a product (0→positive), restock emails auto-send to all subscribers. |
 | **Admin batch editing** | Edit multiple products inline, review changes in modal, confirm before saving. |
 | **Hidden admin path** | Admin panel at `/gallium/` instead of `/admin/` (security through obscurity + one of Alex's favorite element). |
+| **Product styles/variants** | Products can have multiple styles (e.g., "Small Caterpillar", "Be Mine"). Each style has its own stock and optional linked image. |
+| **Style image linking** | Styles can link to product images. Selecting a style moves carousel to that image. Images are moved to style folders in R2. |
+| **Style-aware notifications** | Customers can subscribe to specific style restocks. Restock emails list which styles are available. |
+| **Drag-to-reorder styles** | Admin can reorder styles via drag-and-drop. Visual image picker for linking images to styles. |
 
 ### Key Files to Know
 
@@ -39,6 +43,7 @@ Recent changes to get you up to speed:
 | `src/models/settings.rs` | Site settings model (artist info) |
 | `src/models/newsletter.rs` | Newsletter subscriber model |
 | `src/models/product_notification.rs` | Product restock notification subscriptions |
+| `src/models/product_style.rs` | Product styles/variants model |
 | `src/services/polar.rs` | Polar.sh API client (payments, file uploads) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
@@ -118,7 +123,8 @@ clay/
 │   ├── 009_product_images.sql
 │   ├── 010_site_settings.sql
 │   ├── 011_newsletter_subscribers.sql
-│   └── 012_product_notifications.sql
+│   ├── 012_product_notifications.sql
+│   └── 013_product_styles.sql
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -307,9 +313,21 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | id | TEXT PK | UUID |
 | email | TEXT | Subscriber email |
 | product_id | TEXT FK | References products(id) |
+| style_id | TEXT FK | References product_styles(id), optional |
 | notified | INTEGER | 0 = pending, 1 = sent |
 | created_ts | INTEGER | Unix timestamp |
 | notified_ts | INTEGER | When notification was sent |
+
+### product_styles
+| Column | Type | Description |
+|--------|------|-------------|
+| id | TEXT PK | UUID |
+| product_id | TEXT FK | References products(id) |
+| name | TEXT | Style name (e.g., "Small Caterpillar") |
+| stock_quantity | INTEGER | Stock for this style |
+| image_id | TEXT FK | References product_images(id), optional |
+| sort_order | INTEGER | Display order (0 = first) |
+| created_ts | INTEGER | Unix timestamp |
 
 ### 3. Build and Run
 
@@ -396,6 +414,10 @@ curl -X POST http://localhost:3000/admin/api/products \
 | PUT | `/gallium/products/:id/images/reorder` | Reorder images |
 | DELETE | `/gallium/products/:id/images/:image_id` | Delete image |
 | POST | `/gallium/products/:id/sync-polar` | Manual Polar sync |
+| POST | `/gallium/products/:id/styles` | Create style |
+| PUT | `/gallium/products/:id/styles/:style_id` | Update style |
+| DELETE | `/gallium/products/:id/styles/:style_id` | Delete style |
+| PUT | `/gallium/products/:id/styles/reorder` | Reorder styles |
 | GET | `/gallium/orders` | All orders |
 | PUT | `/gallium/orders/:id/status` | Update status |
 | POST | `/gallium/orders/:id/tracking` | Add tracking |

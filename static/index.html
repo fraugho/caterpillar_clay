@@ -108,7 +108,7 @@
 
     <!-- Product Detail Overlay -->
     <template x-if="selectedProduct && !initializing">
-        <div class="detail-overlay" x-data="{ detailIdx: 0, imgReady: false }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))">
+        <div class="detail-overlay" x-data="{ detailIdx: 0, imgReady: false, selectedStyleId: null, get selectedStyle() { return selectedStyleId ? (selectedProduct.styles || []).find(s => s.id === selectedStyleId) : null; }, get hasStyles() { return selectedProduct.styles && selectedProduct.styles.length > 0; }, get stockInfo() { if (this.hasStyles) { if (!this.selectedStyle) { const total = selectedProduct.styles.reduce((sum, s) => sum + s.stock_quantity, 0); return { quantity: total, text: total > 0 ? 'Select a style' : 'Out of Stock' }; } return { quantity: this.selectedStyle.stock_quantity, text: this.selectedStyle.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } return { quantity: selectedProduct.stock_quantity, text: selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))" @style-select.window="if($event.detail.productId === selectedProduct.id && $event.detail.imageIndex !== undefined) detailIdx = $event.detail.imageIndex">
             <div class="stars"></div>
             <div class="detail-content">
                 <div style="max-width:900px;margin:0 auto;padding:0 20px">
@@ -142,17 +142,51 @@
                         <template x-if="selectedProduct.description">
                             <p style="font-size:10px;color:var(--text-secondary);margin-bottom:28px;line-height:2;display:block" x-text="selectedProduct.description"></p>
                         </template>
-                        <template x-if="selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) === 0">
+
+                        <!-- Style Selector -->
+                        <template x-if="hasStyles">
+                            <div style="max-width:600px;margin:0 auto 28px;display:block">
+                                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Select Style:</p>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
+                                    <template x-for="style in selectedProduct.styles" :key="style.id">
+                                        <button
+                                            :style="{
+                                                background: selectedStyleId === style.id ? 'var(--accent)' : (style.stock_quantity > 0 ? 'var(--bg-secondary)' : '#4b5563'),
+                                                color: selectedStyleId === style.id ? '#18191B' : 'var(--text-primary)',
+                                                border: '3px solid ' + (selectedStyleId === style.id ? 'var(--accent-hover)' : 'var(--border)'),
+                                                opacity: style.stock_quantity === 0 ? 0.7 : 1,
+                                                padding: '16px 12px',
+                                                borderRadius: '10px',
+                                                fontFamily: 'inherit',
+                                                fontSize: '9px',
+                                                cursor: 'none',
+                                                transition: 'all 0.2s',
+                                                transform: selectedStyleId === style.id ? 'scale(1.05)' : 'scale(1)'
+                                            }"
+                                            @click="selectedStyleId = style.id; if(style.image_index !== null && style.image_index !== undefined) detailIdx = style.image_index"
+                                        >
+                                            <span x-text="style.name" style="display:block;margin-bottom:4px"></span>
+                                            <span style="font-size:7px;display:block" :style="{ color: style.stock_quantity > 0 ? (selectedStyleId === style.id ? '#18191B' : '#22c55e') : '#ef4444' }" x-text="style.stock_quantity > 0 ? style.stock_quantity + ' available' : 'Out of Stock'"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:28px;display:block" x-text="stockInfo.text"></p>
+
+                        <!-- No styles: simple add to cart -->
+                        <template x-if="!hasStyles && selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) === 0">
                             <button class="btn" style="max-width:500px;margin:0 auto;padding:18px 24px;font-size:10px;display:block" @click="addToCart(selectedProduct)">ADD TO CART</button>
                         </template>
-                        <template x-if="selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) > 0">
+                        <template x-if="!hasStyles && selectedProduct.stock_quantity > 0 && getCartQuantity(selectedProduct.id) > 0">
                             <div class="qty-controls" style="max-width:500px;margin:0 auto">
                                 <button class="qty-btn minus" style="padding:18px 24px" @click="updateCartQuantity(selectedProduct.id, -1)">-</button>
                                 <span class="qty-display" style="padding:18px 24px;font-size:12px" x-text="getCartQuantity(selectedProduct.id)"></span>
                                 <button class="qty-btn plus" style="padding:18px 24px" @click="addToCart(selectedProduct)">+</button>
                             </div>
                         </template>
-                        <template x-if="selectedProduct.stock_quantity <= 0">
+                        <template x-if="!hasStyles && selectedProduct.stock_quantity <= 0">
                             <div style="max-width:500px;margin:0 auto">
                                 <template x-if="notifyProductId !== selectedProduct.id && !isProductNotified(selectedProduct.id)">
                                     <button class="btn" style="background:#f59e0b;color:#18191B;padding:18px 24px;font-size:10px;width:100%" @click="showNotifyForm(selectedProduct.id)">NOTIFY ME WHEN AVAILABLE</button>
@@ -167,6 +201,45 @@
                                         <div style="display:flex;gap:12px">
                                             <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="closeNotifyForm()">CANCEL</button>
                                             <button class="btn" style="flex:1" @click="subscribeProductNotify(selectedProduct.id)" :disabled="notifyingProduct || !notifyEmail">
+                                                <span x-text="notifyingProduct ? 'SUBSCRIBING...' : 'NOTIFY ME'"></span>
+                                            </button>
+                                        </div>
+                                        <p x-show="notifyMessage" x-text="notifyMessage" style="font-size:8px;margin-top:12px" :style="{ color: notifySuccess ? '#22c55e' : '#ef4444' }"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Has styles: show add to cart or notify based on selected style -->
+                        <template x-if="hasStyles && selectedStyle && selectedStyle.stock_quantity > 0">
+                            <div style="max-width:500px;margin:0 auto">
+                                <template x-if="getCartQuantity(selectedProduct.id, selectedStyleId) === 0">
+                                    <button class="btn" style="padding:18px 24px;font-size:10px;width:100%" @click="addToCartWithStyle(selectedProduct, selectedStyleId, selectedStyle.name)">ADD TO CART</button>
+                                </template>
+                                <template x-if="getCartQuantity(selectedProduct.id, selectedStyleId) > 0">
+                                    <div class="qty-controls">
+                                        <button class="qty-btn minus" style="padding:18px 24px" @click="updateCartQuantity(selectedProduct.id, -1, selectedStyleId)">-</button>
+                                        <span class="qty-display" style="padding:18px 24px;font-size:12px" x-text="getCartQuantity(selectedProduct.id, selectedStyleId)"></span>
+                                        <button class="qty-btn plus" style="padding:18px 24px" @click="addToCartWithStyle(selectedProduct, selectedStyleId, selectedStyle.name)">+</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="hasStyles && selectedStyle && selectedStyle.stock_quantity === 0">
+                            <div style="max-width:500px;margin:0 auto">
+                                <template x-if="notifyProductId !== selectedProduct.id && !isStyleNotified(selectedProduct.id, selectedStyleId)">
+                                    <button class="btn" style="background:#f59e0b;color:#18191B;padding:18px 24px;font-size:10px;width:100%" @click="showNotifyForm(selectedProduct.id, selectedStyleId)">NOTIFY ME WHEN AVAILABLE</button>
+                                </template>
+                                <template x-if="isStyleNotified(selectedProduct.id, selectedStyleId)">
+                                    <button class="btn" style="background:#22c55e;padding:18px 24px;font-size:10px;width:100%" disabled>YOU'LL BE NOTIFIED</button>
+                                </template>
+                                <template x-if="notifyProductId === selectedProduct.id">
+                                    <div style="text-align:center">
+                                        <p style="font-size:10px;margin-bottom:16px;color:var(--text-secondary)">Get notified when <span x-text="selectedStyle.name"></span> is back in stock</p>
+                                        <input type="email" x-model="notifyEmail" placeholder="your@email.com" style="margin-bottom:12px">
+                                        <div style="display:flex;gap:12px">
+                                            <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="closeNotifyForm()">CANCEL</button>
+                                            <button class="btn" style="flex:1" @click="subscribeStyleNotify(selectedProduct.id, selectedStyleId)" :disabled="notifyingProduct || !notifyEmail">
                                                 <span x-text="notifyingProduct ? 'SUBSCRIBING...' : 'NOTIFY ME'"></span>
                                             </button>
                                         </div>
@@ -296,7 +369,7 @@
             <div class="card" style="padding:32px">
                 <h2 style="font-size:14px;margin-bottom:24px">Your Cart</h2>
                 <template x-if="!cart.length"><p style="font-size:10px">Cart is empty</p></template>
-                <template x-for="item in cart" :key="item.id">
+                <template x-for="item in cart" :key="item.id + ':' + (item.styleId || '')">
                     <div style="display:flex;align-items:center;padding:16px 0;border-bottom:2px dashed var(--border);gap:16px">
                         <template x-if="item.images && item.images.length > 0">
                             <img :src="item.images[0]" :alt="item.name" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">
@@ -305,13 +378,18 @@
                             <div style="width:80px;height:80px;background:var(--bg-secondary);border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:6px;color:var(--text-secondary)">[IMG]</div>
                         </template>
                         <div style="flex:1">
-                            <p style="font-size:10px;margin-bottom:6px" x-text="item.name"></p>
+                            <p style="font-size:10px;margin-bottom:6px">
+                                <span x-text="item.name"></span>
+                                <template x-if="item.styleName">
+                                    <span style="color:var(--text-secondary)"> - <span x-text="item.styleName"></span></span>
+                                </template>
+                            </p>
                             <p style="font-size:10px;color:var(--accent)">$<span x-text="(item.price * item.quantity).toFixed(2)"></span></p>
                         </div>
                         <div class="qty-controls" style="width:auto">
-                            <button class="qty-btn minus" style="padding:10px 14px" @click="updateCartQuantity(item.id, -1)">-</button>
+                            <button class="qty-btn minus" style="padding:10px 14px" @click="updateCartQuantity(item.id, -1, item.styleId)">-</button>
                             <span class="qty-display" style="padding:10px 16px;font-size:8px" x-text="item.quantity"></span>
-                            <button class="qty-btn plus" style="padding:10px 14px" @click="addToCart(item)">+</button>
+                            <button class="qty-btn plus" style="padding:10px 14px" @click="item.styleId ? addToCartWithStyle(item, item.styleId, item.styleName) : addToCart(item)">+</button>
                         </div>
                         <button class="btn btn-sm" @click="removeFromCart(item.id)" style="background:#dc2626">X</button>
                     </div>
@@ -377,8 +455,12 @@
                     <div>
                         <p style="font-size:10px;margin-bottom:16px">Step 3: Review Order</p>
                         <div style="margin-bottom:16px">
-                            <template x-for="item in cart" :key="item.id">
-                                <p style="font-size:8px;margin-bottom:4px"><span x-text="item.name"></span> x<span x-text="item.quantity"></span> - $<span x-text="(item.price * item.quantity).toFixed(2)"></span></p>
+                            <template x-for="item in cart" :key="item.id + ':' + (item.styleId || '')">
+                                <p style="font-size:8px;margin-bottom:4px">
+                                    <span x-text="item.name"></span>
+                                    <template x-if="item.styleName"><span style="color:var(--text-secondary)"> (<span x-text="item.styleName"></span>)</span></template>
+                                    x<span x-text="item.quantity"></span> - $<span x-text="(item.price * item.quantity).toFixed(2)"></span>
+                                </p>
                             </template>
                         </div>
                         <p style="font-size:10px;margin-bottom:8px">Shipping to:</p>
@@ -480,6 +562,7 @@
                 shipping:{name:'',street:'',city:'',state:'',zip:'',country:'USA'},
                 notifyEmail:'',
                 notifyProductId:null,
+                notifyStyleIds:[],
                 notifyingProduct:false,
                 notifyMessage:'',
                 notifySuccess:false,
@@ -493,13 +576,13 @@
                     return this.cart.reduce((a,b)=>a+b.quantity,0);
                 },
 
-                getCartQuantity(productId){
-                    const item = this.cart.find(c => c.id === productId);
+                getCartQuantity(productId, styleId = null){
+                    const item = this.cart.find(c => c.id === productId && c.styleId === styleId);
                     return item ? item.quantity : 0;
                 },
 
-                updateCartQuantity(productId, delta){
-                    const idx = this.cart.findIndex(c => c.id === productId);
+                updateCartQuantity(productId, delta, styleId = null){
+                    const idx = this.cart.findIndex(c => c.id === productId && c.styleId === styleId);
                     if(idx === -1) return;
                     this.cart[idx].quantity += delta;
                     if(this.cart[idx].quantity <= 0){
@@ -508,11 +591,72 @@
                 },
 
                 isProductNotified(productId){
-                    // Check if any email has been notified for this product
+                    // Check if any email has been notified for this product (without style)
                     for(const key of this.notifiedProducts){
-                        if(key.endsWith(':' + productId)) return true;
+                        if(key.endsWith(':' + productId + ':')) return true;
                     }
                     return false;
+                },
+
+                isStyleNotified(productId, styleId){
+                    // Check if this specific style has been notified
+                    for(const key of this.notifiedProducts){
+                        if(key.endsWith(':' + productId + ':' + styleId)) return true;
+                    }
+                    return false;
+                },
+
+                addToCartWithStyle(product, styleId, styleName){
+                    // Find existing item with same product+style
+                    const existing = this.cart.find(c => c.id === product.id && c.styleId === styleId);
+                    if(existing){
+                        existing.quantity++;
+                    } else {
+                        this.cart.push({
+                            id: product.id,
+                            styleId: styleId,
+                            styleName: styleName,
+                            name: product.name,
+                            price: product.price,
+                            images: product.images,
+                            quantity: 1
+                        });
+                    }
+                },
+
+                showNotifyForm(productId, styleId = null){
+                    this.notifyProductId = productId;
+                    this.notifyStyleIds = styleId ? [styleId] : [];
+                    this.notifyMessage = '';
+                },
+
+                async subscribeStyleNotify(productId, styleId){
+                    const email = this.notifyEmail.toLowerCase().trim();
+                    if(!email || !styleId) return;
+                    const key = `${email}:${productId}:${styleId}`;
+                    if(this.notifiedProducts.has(key)) return;
+                    this.notifyingProduct = true;
+                    this.notifyMessage = '';
+                    try {
+                        const res = await fetch(`/api/products/${productId}/notify`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: email, style_ids: [styleId] })
+                        });
+                        const data = await res.json();
+                        this.notifySuccess = data.success;
+                        this.notifyMessage = data.message;
+                        if(data.success) {
+                            this.notifiedProducts.add(key);
+                            localStorage.setItem('notifiedProducts', JSON.stringify([...this.notifiedProducts]));
+                            setTimeout(() => this.closeNotifyForm(), 2000);
+                        }
+                    } catch(e) {
+                        this.notifySuccess = false;
+                        this.notifyMessage = 'Something went wrong. Please try again.';
+                    } finally {
+                        this.notifyingProduct = false;
+                    }
                 },
 
                 get isShippingValid(){
@@ -537,14 +681,15 @@
                     if (savedCart) {
                         try {
                             const parsed = JSON.parse(savedCart);
-                            // Migrate old cart format: add quantity if missing, dedupe by id
+                            // Migrate old cart format: add quantity if missing, dedupe by id+styleId
                             const cartMap = new Map();
                             for (const item of parsed) {
                                 if (!item.id) continue;
-                                if (cartMap.has(item.id)) {
-                                    cartMap.get(item.id).quantity += (item.quantity || 1);
+                                const key = item.id + ':' + (item.styleId || '');
+                                if (cartMap.has(key)) {
+                                    cartMap.get(key).quantity += (item.quantity || 1);
                                 } else {
-                                    cartMap.set(item.id, {...item, quantity: item.quantity || 1});
+                                    cartMap.set(key, {...item, quantity: item.quantity || 1, styleId: item.styleId || null});
                                 }
                             }
                             this.cart = Array.from(cartMap.values());
@@ -715,7 +860,7 @@
                 async subscribeProductNotify(productId){
                     const email = this.notifyEmail.toLowerCase().trim();
                     if(!email) return;
-                    const key = `${email}:${productId}`;
+                    const key = `${email}:${productId}:`;
                     if(this.notifiedProducts.has(key)) return;
                     this.notifyingProduct = true;
                     this.notifyMessage = '';

@@ -117,6 +117,16 @@ impl ProductImage {
             None => Ok(None),
         }
     }
+
+    pub async fn update_path(conn: &Connection, id: &str, new_path: &str) -> AppResult<()> {
+        conn.execute(
+            "UPDATE product_images SET image_path = ? WHERE id = ?",
+            libsql::params![new_path.to_string(), id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

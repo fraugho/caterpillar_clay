@@ -405,10 +405,37 @@ impl ResendService {
         product: &Product,
         product_image_url: Option<&str>,
     ) -> AppResult<()> {
+        self.send_product_restock_alert_with_styles(to_email, product, product_image_url, &[]).await
+    }
+
+    /// Send a restock notification with specific styles that are back in stock
+    pub async fn send_product_restock_alert_with_styles(
+        &self,
+        to_email: &str,
+        product: &Product,
+        product_image_url: Option<&str>,
+        styles: &[String],
+    ) -> AppResult<()> {
         let product_url = format!("{}/?product={}", self.base_url, product.id);
 
         let image_html = if let Some(img_url) = product_image_url {
             format!(r#"<img src="{}" alt="{}" style="max-width:100%;height:auto;border-radius:8px;margin-bottom:20px;border:2px solid #E0E0E0">"#, img_url, product.name)
+        } else {
+            String::new()
+        };
+
+        let styles_html = if !styles.is_empty() {
+            let style_list: String = styles.iter()
+                .map(|s| format!("<li style=\"margin:4px 0\">{}</li>", s))
+                .collect::<Vec<_>>()
+                .join("");
+            format!(
+                r#"<div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:8px;padding:16px;margin:20px 0;text-align:left">
+                    <p style="font-size:11px;color:#166534;margin:0 0 8px;font-weight:bold">Available Styles:</p>
+                    <ul style="margin:0;padding-left:20px;font-size:11px;color:#166534">{}</ul>
+                </div>"#,
+                style_list
+            )
         } else {
             String::new()
         };
@@ -435,6 +462,7 @@ impl ResendService {
         {}
         <h2>{}</h2>
         <p class="price">${:.2}</p>
+        {}
         <p class="description">Grab it before it's gone again!</p>
         <a href="{}" class="btn">SHOP NOW</a>
         <div class="footer">
@@ -447,13 +475,16 @@ impl ResendService {
             image_html,
             product.name,
             product.price_cents as f64 / 100.0,
+            styles_html,
             product_url
         );
 
-        self.send_email(
-            to_email,
-            &format!("It's Back! {} is in stock - Caterpillar Clay", product.name),
-            &html,
-        ).await
+        let subject = if styles.len() == 1 {
+            format!("It's Back! {} - {} is in stock - Caterpillar Clay", product.name, styles[0])
+        } else {
+            format!("It's Back! {} is in stock - Caterpillar Clay", product.name)
+        };
+
+        self.send_email(to_email, &subject, &html).await
     }
 }

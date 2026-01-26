@@ -45,4 +45,16 @@ impl StorageBackend for S3Storage {
     fn public_url(&self, path: &str) -> String {
         path.to_string()
     }
+
+    async fn get_object(&self, _path: &str) -> Result<Vec<u8>, StorageError> {
+        Err(StorageError::NotConfigured(
+            "S3 storage not yet implemented".to_string(),
+        ))
+    }
+
+    async fn move_object(&self, _from_path: &str, _to_folder: &str) -> Result<String, StorageError> {
+        Err(StorageError::NotConfigured(
+            "S3 storage not yet implemented".to_string(),
+        ))
+    }
 }
