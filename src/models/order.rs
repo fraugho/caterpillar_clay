@@ -58,7 +58,7 @@ pub struct Order {
     pub total_cents: i32,
     pub shipping_address: String,
     pub tracking_number: Option<String>,
-    pub easypost_tracker_id: Option<String>,
+    pub shippo_tracker_id: Option<String>,
     pub stripe_session_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
@@ -73,7 +73,7 @@ impl Order {
             total_cents: row.get(3)?,
             shipping_address: row.get(4)?,
             tracking_number: row.get(5)?,
-            easypost_tracker_id: row.get(6)?,
+            shippo_tracker_id: row.get(6)?,
             stripe_session_id: row.get(7)?,
             created_ts: row.get(10)?,
             updated_ts: row.get(11)?,
@@ -255,7 +255,7 @@ impl Order {
         conn: &Connection,
         id: &str,
         tracking_number: &str,
-        easypost_tracker_id: Option<&str>,
+        shippo_tracker_id: Option<&str>,
     ) -> AppResult<Self> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -266,12 +266,12 @@ impl Order {
             r#"
             UPDATE orders SET
                 tracking_number = ?,
-                easypost_tracker_id = ?,
+                shippo_tracker_id = ?,
                 status = 'shipped',
                 updated_ts = ?
             WHERE id = ?
             "#,
-            libsql::params![tracking_number.to_string(), easypost_tracker_id.map(|s| s.to_string()), now, id.to_string()],
+            libsql::params![tracking_number.to_string(), shippo_tracker_id.map(|s| s.to_string()), now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

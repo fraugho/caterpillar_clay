@@ -45,6 +45,7 @@ Recent changes to get you up to speed:
 | `src/models/product_notification.rs` | Product restock notification subscriptions |
 | `src/models/product_style.rs` | Product styles/variants model |
 | `src/services/stripe.rs` | Stripe API client (payments, products, checkout) |
+| `src/services/shippo.rs` | Shippo API client (shipping tracking) |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
 
@@ -58,6 +59,10 @@ Recent changes to get you up to speed:
 | Cloudflare | Enable cache rules for images | Dashboard → Caching → Cache Rules |
 | Turso | Nothing needed | Already stops at free tier |
 | Cloudflare R2 | Nothing needed | Free tier: 10GB storage, 10M reads/month |
+| Stripe | Configure production webhook | https://dashboard.stripe.com/webhooks → Add `https://caterpillarclay.com/api/webhooks/stripe` |
+| Stripe | Switch to live API keys | Replace `sk_test_` / `pk_test_` with `sk_live_` / `pk_live_` |
+| Shippo | Configure webhook for tracking updates | https://apps.goshippo.com/settings/webhooks → Add `https://caterpillarclay.com/api/webhooks/shippo` with `track_updated` event |
+| Shippo | Switch to live API key | Replace `shippo_test_` with `shippo_live_` |
 
 ## Architecture
 
@@ -74,14 +79,14 @@ Recent changes to get you up to speed:
 │  │   Routes    │  │  Services   │  │   Storage   │             │
 │  │  /api/*     │  │  - Clerk    │  │  - Local    │             │
 │  │  /admin/*   │  │  - Stripe   │  │  - R2       │             │
-│  │  /webhooks  │  │  - EasyPost │  │             │             │
+│  │  /webhooks  │  │  - Shippo   │  │             │             │
 │  └─────────────┘  │  - Email    │  └─────────────┘             │
 │                   └─────────────┘                               │
 └─────────────────────────────────────────────────────────────────┘
          │                │                    │
          ▼                ▼                    ▼
 ┌──────────────┐  ┌──────────────┐    ┌──────────────┐
-│ libsql/Turso │  │    Clerk     │    │   EasyPost   │
+│ libsql/Turso │  │    Clerk     │    │    Shippo    │
 │   Database   │  │    (Auth)    │    │  (Shipping)  │
 └──────────────┘  └──────────────┘    └──────────────┘
                          │
@@ -100,7 +105,7 @@ Recent changes to get you up to speed:
 - **Storage**: Cloudflare R2 (S3-compatible)
 - **Authentication**: Clerk
 - **Payments**: Stripe (currently using test mode - see Stripe Integration section)
-- **Shipping**: EasyPost
+- **Shipping**: Shippo
 - **Email**: SMTP (Resend/SES)
 - **Frontend**: HTMX + Alpine.js
 - **Styling**: Custom pixel-art CSS
@@ -125,7 +130,8 @@ clay/
 │   ├── 011_newsletter_subscribers.sql
 │   ├── 012_product_notifications.sql
 │   ├── 013_product_styles.sql
-│   └── 014_rename_polar_to_stripe.sql  # Renames polar_* columns to stripe_*
+│   ├── 014_rename_polar_to_stripe.sql  # Renames polar_* columns to stripe_*
+│   └── 015_rename_easypost_to_shippo.sql  # Renames easypost_tracker_id to shippo_tracker_id
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -142,7 +148,7 @@ clay/
 │   ├── services/           # External integrations
 │   │   ├── clerk.rs        # Clerk auth
 │   │   ├── stripe.rs       # Payments & products
-│   │   ├── easypost.rs     # Shipping
+│   │   ├── shippo.rs       # Shipping
 │   │   └── email.rs        # Notifications
 │   ├── storage/            # File storage (Local/R2)
 │   └── middleware/         # Auth middleware
@@ -162,7 +168,7 @@ clay/
 - External service accounts (optional for development):
   - Clerk (authentication)
   - Stripe (payments) - test keys work for development
-  - EasyPost (shipping)
+  - Shippo (shipping)
   - Resend/SMTP (email)
 
 ### 1. Clone and Configure
@@ -194,9 +200,8 @@ STRIPE_SECRET_KEY=sk_test_xxxxx
 STRIPE_PUBLISHABLE_KEY=pk_test_xxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxx
 
-# For shipping (get from easypost.com)
-EASYPOST_API_KEY=EZAK_xxxxx
-EASYPOST_WEBHOOK_SECRET=whsec_xxxxx
+# For shipping (get from goshippo.com)
+SHIPPO_API_KEY=shippo_test_xxxxx
 
 # For email (get from resend.com or use any SMTP)
 SMTP_HOST=smtp.resend.com
@@ -281,7 +286,7 @@ for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
 | total_cents | INTEGER | Order total in cents |
 | shipping_address | TEXT | JSON address object |
 | tracking_number | TEXT | Shipping tracking number |
-| easypost_tracker_id | TEXT | EasyPost tracker ID |
+| shippo_tracker_id | TEXT | Shippo tracker ID |
 | stripe_session_id | TEXT | Stripe checkout session ID |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
@@ -436,7 +441,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/webhooks/stripe` | Stripe payment confirmations |
-| POST | `/webhooks/easypost` | Shipping updates |
+| POST | `/webhooks/shippo` | Shipping updates |
 
 ## Stripe Integration
 
@@ -498,7 +503,7 @@ cargo build --release
 
 - Set `BASE_URL` to your production domain
 - Configure proper SMTP credentials
-- Set up webhook endpoints in Stripe and EasyPost dashboards
+- Set up webhook endpoints in Stripe and Shippo dashboards
 - Set `TESTING_MODE=false`
 
 ### Running with systemd

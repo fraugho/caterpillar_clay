@@ -19,7 +19,7 @@ pub struct AdminOrderResponse {
     pub total: f64,
     pub shipping_address: Option<ShippingAddress>,
     pub tracking_number: Option<String>,
-    pub easypost_tracker_id: Option<String>,
+    pub shippo_tracker_id: Option<String>,
     pub items: Vec<AdminOrderItemResponse>,
     pub created_ts: i64,
     pub updated_ts: i64,
@@ -87,7 +87,7 @@ async fn list_orders(State(state): State<AppState>) -> AppResult<Json<Vec<AdminO
             total: order.total_cents as f64 / 100.0,
             shipping_address: order.get_shipping_address(),
             tracking_number: order.tracking_number.clone(),
-            easypost_tracker_id: order.easypost_tracker_id.clone(),
+            shippo_tracker_id: order.shippo_tracker_id.clone(),
             items,
             created_ts: order.created_ts,
             updated_ts: order.updated_ts,
@@ -128,7 +128,7 @@ async fn get_order(
         total: order.total_cents as f64 / 100.0,
         shipping_address: order.get_shipping_address(),
         tracking_number: order.tracking_number.clone(),
-        easypost_tracker_id: order.easypost_tracker_id.clone(),
+        shippo_tracker_id: order.shippo_tracker_id.clone(),
         items,
         created_ts: order.created_ts,
         updated_ts: order.updated_ts,
@@ -169,7 +169,7 @@ async fn update_status(
         total: order.total_cents as f64 / 100.0,
         shipping_address: order.get_shipping_address(),
         tracking_number: order.tracking_number.clone(),
-        easypost_tracker_id: order.easypost_tracker_id.clone(),
+        shippo_tracker_id: order.shippo_tracker_id.clone(),
         items,
         created_ts: order.created_ts,
         updated_ts: order.updated_ts,
@@ -188,14 +188,15 @@ async fn add_tracking(
         .await?
         .ok_or_else(|| AppError::NotFound("Order not found".to_string()))?;
 
-    // Create EasyPost tracker
-    let tracker = state
-        .easypost
-        .create_tracker(&payload.tracking_number, payload.carrier.as_deref())
+    // Register tracking with Shippo
+    let carrier = payload.carrier.as_deref().unwrap_or("usps");
+    let tracking = state
+        .shippo
+        .register_tracking(&payload.tracking_number, carrier)
         .await?;
 
     // Update order with tracking info
-    let order = Order::set_tracking(&conn, &id, &payload.tracking_number, Some(&tracker.id))
+    let order = Order::set_tracking(&conn, &id, &payload.tracking_number, Some(&tracking.tracking_number))
         .await?;
 
     // Send shipping notification email
@@ -232,7 +233,7 @@ async fn add_tracking(
         total: order.total_cents as f64 / 100.0,
         shipping_address: order.get_shipping_address(),
         tracking_number: order.tracking_number.clone(),
-        easypost_tracker_id: order.easypost_tracker_id.clone(),
+        shippo_tracker_id: order.shippo_tracker_id.clone(),
         items,
         created_ts: order.created_ts,
         updated_ts: order.updated_ts,

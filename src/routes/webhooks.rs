@@ -9,12 +9,12 @@ use serde_json::json;
 
 use crate::models::{Order, OrderStatus, Product, User};
 use crate::routes::AppState;
-use crate::services::easypost::EasyPostWebhookEvent;
+use crate::services::shippo::{ShippoService, ShippoWebhookEvent};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/webhooks/stripe", post(stripe_webhook))
-        .route("/webhooks/easypost", post(easypost_webhook))
+        .route("/webhooks/shippo", post(shippo_webhook))
 }
 
 async fn stripe_webhook(
@@ -127,20 +127,14 @@ async fn stripe_webhook(
     (StatusCode::OK, Json(json!({"received": true})))
 }
 
-async fn easypost_webhook(
+async fn shippo_webhook(
     State(state): State<AppState>,
-    headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // Verify webhook signature (in production)
-    let _signature = headers
-        .get("x-easypost-signature")
-        .and_then(|h| h.to_str().ok());
-
-    let event: EasyPostWebhookEvent = match serde_json::from_slice(&body) {
+    let event: ShippoWebhookEvent = match serde_json::from_slice(&body) {
         Ok(e) => e,
         Err(e) => {
-            tracing::error!("Failed to parse EasyPost webhook: {}", e);
+            tracing::error!("Failed to parse Shippo webhook: {}", e);
             return (
                 StatusCode::BAD_REQUEST,
                 Json(json!({"error": "Invalid payload"})),
@@ -148,7 +142,7 @@ async fn easypost_webhook(
         }
     };
 
-    tracing::info!("Received EasyPost webhook: {}", event.description);
+    tracing::info!("Received Shippo webhook: {}", event.event);
 
     let conn = match state.db.connect() {
         Ok(c) => c,
@@ -158,9 +152,9 @@ async fn easypost_webhook(
         }
     };
 
-    let tracker = &event.result;
+    let tracking_data = &event.data;
 
-    // Find order by tracker ID
+    // Find order by tracking number
     let orders = match Order::list_all(&conn).await {
         Ok(o) => o,
         Err(e) => {
@@ -171,14 +165,17 @@ async fn easypost_webhook(
 
     let order = orders
         .into_iter()
-        .find(|o| o.easypost_tracker_id.as_deref() == Some(&tracker.id));
+        .find(|o| o.tracking_number.as_deref() == Some(&tracking_data.tracking_number));
 
     if let Some(order) = order {
-        let new_status = match tracker.status.as_str() {
-            "delivered" => Some(OrderStatus::Delivered),
-            "in_transit" | "out_for_delivery" => Some(OrderStatus::Shipped),
-            _ => None,
-        };
+        let shippo_status = tracking_data
+            .tracking_status
+            .as_ref()
+            .map(|s| s.status.as_str())
+            .unwrap_or("");
+
+        let order_status = ShippoService::map_status_to_order_status(shippo_status);
+        let new_status = OrderStatus::from_str(order_status);
 
         if let Some(status) = new_status {
             if let Err(e) = Order::update_status(&conn, &order.id, status).await {

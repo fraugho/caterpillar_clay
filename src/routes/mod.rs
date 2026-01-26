@@ -17,7 +17,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
 use crate::middleware::auth::auth_middleware;
-use crate::services::{ClerkService, EasyPostService, EmailService, ResendService, StripeService};
+use crate::services::{ClerkService, EmailService, ResendService, ShippoService, StripeService};
 use crate::storage::StorageBackend;
 
 #[derive(Clone)]
@@ -26,7 +26,7 @@ pub struct AppState {
     pub config: Config,
     pub clerk: ClerkService,
     pub stripe: StripeService,
-    pub easypost: EasyPostService,
+    pub shippo: ShippoService,
     pub email: Option<EmailService>,
     pub resend: Option<ResendService>,
     pub storage: Arc<dyn StorageBackend>,
