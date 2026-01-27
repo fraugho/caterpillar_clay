@@ -8,7 +8,7 @@ COPY Cargo.toml Cargo.lock* ./
 
 # Create dummy src to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release && rm -rf src target/release/caterpillar_clay*
+RUN cargo build --release && rm -rf src target/release/caterpillar-clay*
 
 # Copy actual source code
 COPY src ./src
@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/target/release/caterpillar_clay .
+COPY --from=builder /app/target/release/caterpillar-clay .
 
 # Copy static files and migrations
 COPY --from=builder /app/static ./static
@@ -40,4 +40,4 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["./caterpillar_clay"]
+CMD ["./caterpillar-clay"]
