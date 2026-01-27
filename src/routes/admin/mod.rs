@@ -68,7 +68,7 @@ pub fn routes(state: AppState) -> Router<AppState> {
     // so middleware applies properly
     let static_routes = Router::new()
         .route("/", get(serve_admin_static))
-        .route("/*path", get(serve_admin_static));
+        .route("/{*path}", get(serve_admin_static));
 
     let base_router = Router::new()
         .nest("/api", api_routes)
