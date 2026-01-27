@@ -11,8 +11,11 @@ use crate::middleware::auth::{auth_middleware, require_admin};
 use crate::routes::AppState;
 
 pub fn routes(state: AppState) -> Router<AppState> {
-    let api_routes = if state.config.testing_mode {
-        // Skip auth in testing mode
+    // Skip auth only in local testing mode (not cloud)
+    let skip_auth = state.config.testing_mode && !state.config.deploy_mode.is_cloud();
+
+    let api_routes = if skip_auth {
+        // Skip auth in local testing mode only
         Router::new()
             .merge(products::routes())
             .merge(orders::routes())
