@@ -3,6 +3,7 @@ use std::env;
 #[derive(Clone)]
 pub struct Config {
     pub database_url: String,
+    pub turso_auth_token: Option<String>,
     pub clerk_secret_key: String,
     pub clerk_publishable_key: String,
     pub stripe_secret_key: String,
@@ -28,16 +29,36 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, env::VarError> {
+        // Read testing mode first to determine which keys to use
+        let testing_mode = env::var("TESTING_MODE")
+            .unwrap_or_else(|_| "false".to_string())
+            .to_lowercase() == "true";
+
+        let suffix = if testing_mode { "_TEST" } else { "_PROD" };
+
+        // Helper to get env var with test/prod suffix, falling back to non-suffixed
+        let get_env = |key: &str| -> Result<String, env::VarError> {
+            env::var(format!("{}{}", key, suffix))
+                .or_else(|_| env::var(key))
+        };
+
+        let get_env_optional = |key: &str| -> Option<String> {
+            env::var(format!("{}{}", key, suffix))
+                .or_else(|_| env::var(key))
+                .ok()
+        };
+
         Ok(Self {
-            database_url: env::var("DATABASE_URL")?,
-            clerk_secret_key: env::var("CLERK_SECRET_KEY")?,
-            clerk_publishable_key: env::var("CLERK_PUBLISHABLE_KEY")?,
-            stripe_secret_key: env::var("STRIPE_SECRET_KEY")?,
-            stripe_publishable_key: env::var("STRIPE_PUBLISHABLE_KEY")
-                .unwrap_or_else(|_| String::new()),
-            stripe_webhook_secret: env::var("STRIPE_WEBHOOK_SECRET")
-                .unwrap_or_else(|_| String::new()),
-            shippo_api_key: env::var("SHIPPO_API_KEY")?,
+            database_url: get_env("DATABASE_URL")?,
+            turso_auth_token: get_env_optional("TURSO_AUTH_TOKEN"),
+            clerk_secret_key: get_env("CLERK_SECRET_KEY")?,
+            clerk_publishable_key: get_env("CLERK_PUBLISHABLE_KEY")?,
+            stripe_secret_key: get_env("STRIPE_SECRET_KEY")?,
+            stripe_publishable_key: get_env_optional("STRIPE_PUBLISHABLE_KEY")
+                .unwrap_or_default(),
+            stripe_webhook_secret: get_env_optional("STRIPE_WEBHOOK_SECRET")
+                .unwrap_or_default(),
+            shippo_api_key: get_env("SHIPPO_API_KEY")?,
             smtp_host: env::var("SMTP_HOST").unwrap_or_else(|_| "smtp.resend.com".to_string()),
             smtp_user: env::var("SMTP_USER").unwrap_or_else(|_| "resend".to_string()),
             smtp_pass: env::var("SMTP_PASS")?,
@@ -56,9 +77,7 @@ impl Config {
                 .unwrap_or_else(|_| "3000".to_string())
                 .parse()
                 .unwrap_or(3000),
-            testing_mode: env::var("TESTING_MODE")
-                .unwrap_or_else(|_| "false".to_string())
-                .to_lowercase() == "true",
+            testing_mode,
         })
     }
 }

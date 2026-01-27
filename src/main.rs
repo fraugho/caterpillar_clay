@@ -33,8 +33,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration
     let config = Config::from_env().expect("Failed to load configuration");
 
+    if config.testing_mode {
+        tracing::warn!("TESTING MODE - Using test API keys and database");
+    } else {
+        tracing::info!("PRODUCTION MODE - Using production API keys and database");
+    }
+
     // Create database connection
-    let db = db::create_database(&config.database_url)
+    let db = db::create_database(&config.database_url, config.turso_auth_token.as_deref())
         .await
         .expect("Failed to create database");
 

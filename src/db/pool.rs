@@ -1,13 +1,12 @@
 use libsql::{Builder, Database};
-use std::env;
 
-pub async fn create_database(database_url: &str) -> Result<Database, libsql::Error> {
+pub async fn create_database(database_url: &str, auth_token: Option<&str>) -> Result<Database, libsql::Error> {
     // Check if this is a Turso remote URL
     if database_url.starts_with("libsql://") {
-        let auth_token = env::var("TURSO_AUTH_TOKEN")
+        let token = auth_token
             .expect("TURSO_AUTH_TOKEN must be set for remote database");
 
-        Builder::new_remote(database_url.to_string(), auth_token)
+        Builder::new_remote(database_url.to_string(), token.to_string())
             .build()
             .await
     } else {

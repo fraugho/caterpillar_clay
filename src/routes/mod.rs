@@ -48,7 +48,7 @@ pub fn create_router(state: AppState) -> Router {
     let admin_routes = admin::routes(state.db.clone(), state.config.testing_mode);
 
     if state.config.testing_mode {
-        tracing::warn!("⚠️  TESTING MODE ENABLED - Admin auth is disabled!");
+        tracing::warn!("TESTING MODE ENABLED - Admin auth is disabled!");
     }
 
     Router::new()

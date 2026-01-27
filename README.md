@@ -180,62 +180,89 @@ cd clay
 cp .env.example .env
 ```
 
-Edit `.env` with your configuration:
+Edit `.env` with your configuration. The app uses `TESTING_MODE` to switch between test and production credentials:
 
 ```bash
-# Database (libsql - local SQLite or Turso)
-# For local SQLite:
-DATABASE_URL=./caterpillar_clay.db
-# For Turso (when ready):
-# DATABASE_URL=libsql://your-database.turso.io
-# TURSO_AUTH_TOKEN=your_auth_token
+# Environment mode - switches which API keys/database to use
+TESTING_MODE=true  # true = test keys, false = production keys
 
-# For auth (get from clerk.com)
-CLERK_SECRET_KEY=sk_test_xxxxx
-CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
+# Database (Turso) - uses branching for test/prod separation
+DATABASE_URL_TEST=libsql://your-db-test.turso.io
+TURSO_AUTH_TOKEN_TEST=your_test_token
+DATABASE_URL_PROD=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN_PROD=your_prod_token
 
-# For payments (get from stripe.com/dashboard)
-# Currently using TEST keys - switch to live keys for production
-STRIPE_SECRET_KEY=sk_test_xxxxx
-STRIPE_PUBLISHABLE_KEY=pk_test_xxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxx
+# Clerk auth (get from clerk.com)
+CLERK_SECRET_KEY_TEST=sk_test_xxxxx
+CLERK_PUBLISHABLE_KEY_TEST=pk_test_xxxxx
+CLERK_SECRET_KEY_PROD=sk_live_xxxxx
+CLERK_PUBLISHABLE_KEY_PROD=pk_live_xxxxx
 
-# For shipping (get from goshippo.com)
-SHIPPO_API_KEY=shippo_test_xxxxx
+# Stripe payments (get from stripe.com/dashboard)
+STRIPE_SECRET_KEY_TEST=sk_test_xxxxx
+STRIPE_PUBLISHABLE_KEY_TEST=pk_test_xxxxx
+STRIPE_WEBHOOK_SECRET_TEST=whsec_xxxxx
+STRIPE_SECRET_KEY_PROD=sk_live_xxxxx
+STRIPE_PUBLISHABLE_KEY_PROD=pk_live_xxxxx
+STRIPE_WEBHOOK_SECRET_PROD=whsec_xxxxx
 
-# For email (get from resend.com or use any SMTP)
+# Shippo shipping (get from goshippo.com)
+SHIPPO_API_KEY_TEST=shippo_test_xxxxx
+SHIPPO_API_KEY_PROD=shippo_live_xxxxx
+
+# Email (same for test/prod)
 SMTP_HOST=smtp.resend.com
 SMTP_USER=resend
 SMTP_PASS=re_xxxxx
 FROM_EMAIL=orders@yourdomain.com
-
-# For newsletter (get from resend.com)
 RESEND_API_KEY=re_xxxxx
 
-# Storage (local or r2)
-STORAGE_TYPE=local
+# Storage - Cloudflare R2 (same for test/prod)
+STORAGE_TYPE=r2
 UPLOAD_DIR=./static/uploads
-
-# Cloudflare R2 (when STORAGE_TYPE=r2)
-# R2_BUCKET=your-bucket-name
-# R2_ACCOUNT_ID=your-cloudflare-account-id
-# R2_ACCESS_KEY=your-r2-access-key
-# R2_SECRET_KEY=your-r2-secret-key
-# R2_PUBLIC_URL=https://pub-xxx.r2.dev
+R2_BUCKET=your-bucket-name
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY=your-r2-access-key
+R2_SECRET_KEY=your-r2-secret-key
+R2_PUBLIC_URL=https://pub-xxx.r2.dev
 
 # Server config
 BASE_URL=http://localhost:3000
 PORT=3000
-
-# Testing (set to true to bypass admin auth)
-TESTING_MODE=false
 ```
 
-### 2. Set Up Database
+### 2. Set Up Database (Turso)
+
+We use Turso database branching to separate test and production data:
 
 ```bash
-# Run all migrations (creates the database file automatically)
-for f in migrations/*.sql; do sqlite3 caterpillar_clay.db < "$f"; done
+# Install Turso CLI
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# Login to Turso
+turso auth login
+
+# Create production database
+turso db create caterpillar-clay
+
+# Create test branch (copy of production)
+turso db create caterpillar-clay-test --from-db caterpillar-clay
+
+# Get connection URLs and tokens
+turso db show caterpillar-clay
+turso db tokens create caterpillar-clay
+
+turso db show caterpillar-clay-test
+turso db tokens create caterpillar-clay-test
+
+# Run migrations on production
+turso db shell caterpillar-clay < migrations/001_create_users.sql
+# ... run all migrations
+
+# Refresh test from production (sync data)
+turso db destroy caterpillar-clay-test --yes
+turso db create caterpillar-clay-test --from-db caterpillar-clay
+# Then regenerate the test token and update .env
 ```
 
 **Note:** Timestamps are stored as Unix epoch integers (`i64`) for efficiency. The `created_ts` and `updated_ts` fields use seconds since 1970-01-01.
