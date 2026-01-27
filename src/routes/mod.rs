@@ -63,8 +63,10 @@ pub fn create_router(state: AppState) -> Router {
         .merge(cart::routes())
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
 
-    if state.config.testing_mode {
-        tracing::warn!("TESTING MODE ENABLED - Admin auth is disabled!");
+    if state.config.testing_mode && !state.config.deploy_mode.is_cloud() {
+        tracing::warn!("TESTING MODE (local) - Admin auth is disabled!");
+    } else if state.config.testing_mode {
+        tracing::info!("TESTING MODE (cloud) - Admin auth is enabled");
     }
 
     let admin_routes = admin::routes(state.clone());

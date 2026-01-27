@@ -57,6 +57,13 @@ pub fn routes(state: AppState) -> Router<AppState> {
     // Skip auth only in local testing mode (not cloud)
     let skip_auth = state.config.testing_mode && !state.config.deploy_mode.is_cloud();
 
+    tracing::info!(
+        "Admin routes: testing_mode={}, is_cloud={}, skip_auth={}",
+        state.config.testing_mode,
+        state.config.deploy_mode.is_cloud(),
+        skip_auth
+    );
+
     let api_routes = Router::new()
         .merge(products::routes())
         .merge(orders::routes())
