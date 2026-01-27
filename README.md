@@ -46,6 +46,8 @@ Recent changes to get you up to speed:
 | `src/models/product_style.rs` | Product styles/variants model |
 | `src/services/stripe.rs` | Stripe API client (payments, products, checkout) |
 | `src/services/shippo.rs` | Shippo API client (shipping tracking) |
+| `src/services/jwks.rs` | JWKS verifier for Clerk JWT authentication |
+| `src/services/rate_limiter.rs` | Upstash Redis rate limiter |
 | `src/models/product.rs` | Product and ProductImage models |
 | `src/storage/r2.rs` | Cloudflare R2 storage backend |
 
@@ -90,12 +92,12 @@ Recent changes to get you up to speed:
 │   Database   │  │    (Auth)    │    │  (Shipping)  │
 └──────────────┘  └──────────────┘    └──────────────┘
                          │
-         ┌───────────────┴───────────────┐
-         ▼                               ▼
-┌──────────────┐                ┌──────────────┐
-│    Stripe    │                │ Email (SMTP) │
-│  (Payments)  │                │   Resend     │
-└──────────────┘                └──────────────┘
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│    Stripe    │  │ Email (SMTP) │  │   Upstash    │
+│  (Payments)  │  │   Resend     │  │   (Redis)    │
+└──────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ## Tech Stack
@@ -103,12 +105,27 @@ Recent changes to get you up to speed:
 - **Backend**: Rust with Axum web framework
 - **Database**: libsql/Turso (SQLite compatible, edge-ready)
 - **Storage**: Cloudflare R2 (S3-compatible)
-- **Authentication**: Clerk
+- **Authentication**: Clerk (with JWKS JWT verification)
 - **Payments**: Stripe (currently using test mode - see Stripe Integration section)
 - **Shipping**: Shippo
 - **Email**: SMTP (Resend/SES)
 - **Frontend**: HTMX + Alpine.js
 - **Styling**: Custom pixel-art CSS
+
+## Security
+
+### JWT Verification
+Authentication uses Clerk JWTs verified against Clerk's JWKS (JSON Web Key Set) endpoint. Keys are cached in-memory and refreshed lazily (up to 3 retries) when verification fails, handling key rotation gracefully.
+
+### Rate Limiting
+API endpoints are rate-limited using Upstash Redis for distributed rate limiting across multiple server instances:
+
+| Endpoint | Limit | Notes |
+|----------|-------|-------|
+| `/api/*` | 60/min per IP | Configurable via `RATE_LIMIT_GENERAL` |
+| `/api/webhooks/*` | Exempt | Trusted sources (Stripe, Shippo) |
+
+The rate limiter uses a sliding window approach with Redis INCR/EXPIRE commands. If Redis is unavailable, requests are allowed through (fail-open). For additional protection, also configure Cloudflare rate limiting.
 
 ## Project Structure
 
@@ -197,6 +214,7 @@ CLERK_SECRET_KEY_TEST=sk_test_xxxxx
 CLERK_PUBLISHABLE_KEY_TEST=pk_test_xxxxx
 CLERK_SECRET_KEY_PROD=sk_live_xxxxx
 CLERK_PUBLISHABLE_KEY_PROD=pk_live_xxxxx
+CLERK_JWKS_URL=https://your-app.clerk.accounts.dev/.well-known/jwks.json
 
 # Stripe payments (get from stripe.com/dashboard)
 STRIPE_SECRET_KEY_TEST=sk_test_xxxxx
@@ -229,6 +247,15 @@ R2_PUBLIC_URL=https://pub-xxx.r2.dev
 # Server config
 BASE_URL=http://localhost:3000
 PORT=3000
+
+# Rate limiting (requests per minute per IP)
+RATE_LIMIT_GENERAL=60
+RATE_LIMIT_AUTH=60
+RATE_LIMIT_CHECKOUT=60
+
+# Upstash Redis (for distributed rate limiting)
+# Format: rediss://default:TOKEN@host:6379
+UPSTASH_REDIS_URL=rediss://default:xxxxx@your-instance.upstash.io:6379
 ```
 
 ### 2. Set Up Database (Turso)

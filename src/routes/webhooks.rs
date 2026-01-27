@@ -13,8 +13,8 @@ use crate::services::shippo::{ShippoService, ShippoWebhookEvent};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/webhooks/stripe", post(stripe_webhook))
-        .route("/webhooks/shippo", post(shippo_webhook))
+        .route("/stripe", post(stripe_webhook))
+        .route("/shippo", post(shippo_webhook))
 }
 
 async fn stripe_webhook(

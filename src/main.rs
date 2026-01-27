@@ -13,7 +13,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::Config;
 use crate::routes::{create_router, AppState};
-use crate::services::{ClerkService, EmailService, ResendService, ShippoService, StripeService};
+use crate::services::{ClerkService, EmailService, JwksVerifier, RateLimiter, ResendService, ShippoService, StripeService};
 use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
@@ -48,8 +48,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize services
     let clerk = ClerkService::new(&config.clerk_secret_key);
+    let jwks = JwksVerifier::new(&config.clerk_jwks_url);
+
+    // Initialize JWKS cache (fetch keys on startup)
+    if let Err(e) = jwks.initialize().await {
+        tracing::warn!("Failed to initialize JWKS cache: {} - will retry on first request", e);
+    } else {
+        tracing::info!("JWKS cache initialized");
+    }
+
     let stripe = StripeService::new(&config.stripe_secret_key, &config.stripe_webhook_secret);
     let shippo = ShippoService::new(&config.shippo_api_key);
+
+    // Initialize Upstash rate limiter if configured
+    let rate_limiter = match &config.upstash_redis_url {
+        Some(url) => {
+            match RateLimiter::new(url, config.rate_limit_general) {
+                Ok(limiter) => {
+                    tracing::info!("Upstash Redis rate limiter configured");
+                    Some(limiter)
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize rate limiter: {} - rate limiting disabled", e);
+                    None
+                }
+            }
+        }
+        None => {
+            tracing::warn!("Upstash Redis not configured - rate limiting disabled");
+            None
+        }
+    };
 
     let email = match EmailService::new(
         &config.smtp_host,
@@ -100,11 +129,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db: Arc::new(db),
         config: config.clone(),
         clerk,
+        jwks,
         stripe,
         shippo,
         email,
         resend,
         storage,
+        rate_limiter,
     };
 
     // Create router

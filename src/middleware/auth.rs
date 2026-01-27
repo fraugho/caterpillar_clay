@@ -6,13 +6,11 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use jsonwebtoken::dangerous;
-use libsql::Database;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
 
 use crate::models::User;
+use crate::routes::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClerkClaims {
@@ -44,7 +42,7 @@ impl From<User> for AuthUser {
 }
 
 pub async fn auth_middleware(
-    State(db): State<Arc<Database>>,
+    State(state): State<AppState>,
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
@@ -65,11 +63,11 @@ pub async fn auth_middleware(
         }
     };
 
-    // Decode the JWT without verification for now (in production, use JWKS)
-    let claims = match dangerous::insecure_decode::<ClerkClaims>(token) {
-        Ok(data) => data.claims,
+    // Verify JWT using JWKS
+    let claims = match state.jwks.verify_token(token).await {
+        Ok(c) => c,
         Err(e) => {
-            tracing::warn!("JWT decode error: {}", e);
+            tracing::warn!("JWT verification error: {}", e);
             return (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({"error": "Invalid token"})),
@@ -78,7 +76,7 @@ pub async fn auth_middleware(
         }
     };
 
-    let conn = match db.connect() {
+    let conn = match state.db.connect() {
         Ok(c) => c,
         Err(e) => {
             tracing::error!("Database connection error: {}", e);
@@ -114,7 +112,6 @@ pub async fn auth_middleware(
 }
 
 pub async fn require_admin(
-    State(_db): State<Arc<Database>>,
     req: Request<Body>,
     next: Next,
 ) -> Response {

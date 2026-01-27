@@ -6,6 +6,7 @@ pub struct Config {
     pub turso_auth_token: Option<String>,
     pub clerk_secret_key: String,
     pub clerk_publishable_key: String,
+    pub clerk_jwks_url: String,
     pub stripe_secret_key: String,
     pub stripe_publishable_key: String,
     pub stripe_webhook_secret: String,
@@ -25,6 +26,13 @@ pub struct Config {
     pub base_url: String,
     pub port: u16,
     pub testing_mode: bool,
+    // Rate limiting (requests per minute)
+    pub rate_limit_general: u32,
+    pub rate_limit_auth: u32,
+    pub rate_limit_checkout: u32,
+    // Upstash Redis (for distributed rate limiting)
+    // Format: rediss://default:TOKEN@host:6379
+    pub upstash_redis_url: Option<String>,
 }
 
 impl Config {
@@ -48,11 +56,18 @@ impl Config {
                 .ok()
         };
 
+        let clerk_publishable_key = get_env("CLERK_PUBLISHABLE_KEY")?;
+
+        // JWKS URL - must be set in env (derived from Clerk frontend API domain)
+        let clerk_jwks_url = env::var("CLERK_JWKS_URL")
+            .expect("CLERK_JWKS_URL must be set (e.g., https://your-app.clerk.accounts.dev/.well-known/jwks.json)");
+
         Ok(Self {
             database_url: get_env("DATABASE_URL")?,
             turso_auth_token: get_env_optional("TURSO_AUTH_TOKEN"),
             clerk_secret_key: get_env("CLERK_SECRET_KEY")?,
-            clerk_publishable_key: get_env("CLERK_PUBLISHABLE_KEY")?,
+            clerk_publishable_key,
+            clerk_jwks_url,
             stripe_secret_key: get_env("STRIPE_SECRET_KEY")?,
             stripe_publishable_key: get_env_optional("STRIPE_PUBLISHABLE_KEY")
                 .unwrap_or_default(),
@@ -78,6 +93,19 @@ impl Config {
                 .parse()
                 .unwrap_or(3000),
             testing_mode,
+            rate_limit_general: env::var("RATE_LIMIT_GENERAL")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .unwrap_or(60),
+            rate_limit_auth: env::var("RATE_LIMIT_AUTH")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .unwrap_or(60),
+            rate_limit_checkout: env::var("RATE_LIMIT_CHECKOUT")
+                .unwrap_or_else(|_| "60".to_string())
+                .parse()
+                .unwrap_or(60),
+            upstash_redis_url: env::var("UPSTASH_REDIS_URL").ok(),
         })
     }
 }
