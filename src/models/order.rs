@@ -13,6 +13,7 @@ pub enum OrderStatus {
     Shipped,
     Delivered,
     Cancelled,
+    Refunded,
 }
 
 impl OrderStatus {
@@ -24,6 +25,7 @@ impl OrderStatus {
             OrderStatus::Shipped => "shipped",
             OrderStatus::Delivered => "delivered",
             OrderStatus::Cancelled => "cancelled",
+            OrderStatus::Refunded => "refunded",
         }
     }
 
@@ -35,6 +37,7 @@ impl OrderStatus {
             "shipped" => Some(OrderStatus::Shipped),
             "delivered" => Some(OrderStatus::Delivered),
             "cancelled" => Some(OrderStatus::Cancelled),
+            "refunded" => Some(OrderStatus::Refunded),
             _ => None,
         }
     }
@@ -60,6 +63,7 @@ pub struct Order {
     pub tracking_number: Option<String>,
     pub shippo_tracker_id: Option<String>,
     pub stripe_session_id: Option<String>,
+    pub stripe_payment_intent_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
 }
@@ -75,6 +79,7 @@ impl Order {
             tracking_number: row.get(5)?,
             shippo_tracker_id: row.get(6)?,
             stripe_session_id: row.get(7)?,
+            stripe_payment_intent_id: row.get(12)?,
             created_ts: row.get(10)?,
             updated_ts: row.get(11)?,
         })
@@ -153,6 +158,34 @@ impl Order {
             Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
             None => Ok(None),
         }
+    }
+
+    pub async fn find_by_payment_intent(conn: &Connection, payment_intent_id: &str) -> AppResult<Option<Self>> {
+        let mut rows = conn
+            .query("SELECT * FROM orders WHERE stripe_payment_intent_id = ?", [payment_intent_id])
+            .await
+            .map_err(AppError::from)?;
+
+        match rows.next().await.map_err(AppError::from)? {
+            Some(row) => Ok(Some(Self::from_row(&row).map_err(AppError::from)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn set_payment_intent(conn: &Connection, id: &str, payment_intent_id: &str) -> AppResult<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        conn.execute(
+            "UPDATE orders SET stripe_payment_intent_id = ?, updated_ts = ? WHERE id = ?",
+            libsql::params![payment_intent_id.to_string(), now, id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Ok(())
     }
 
     pub async fn list_by_user(conn: &Connection, user_id: &str) -> AppResult<Vec<Self>> {

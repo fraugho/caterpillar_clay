@@ -351,4 +351,22 @@ impl Product {
             .await?
             .ok_or_else(|| AppError::NotFound("Product not found".to_string()))
     }
+
+    pub async fn increment_stock(conn: &Connection, id: &str, quantity: i32) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        conn.execute(
+            "UPDATE products SET stock_quantity = stock_quantity + ?, updated_ts = ? WHERE id = ?",
+            libsql::params![quantity, now, id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Self::find_by_id(conn, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Product not found".to_string()))
+    }
 }

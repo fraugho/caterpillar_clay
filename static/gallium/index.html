@@ -203,7 +203,7 @@
                                     <td x-text="o.id.substring(0,8)"></td>
                                     <td><span class="status" :class="'status-' + o.status" x-text="o.status.toUpperCase()"></span></td>
                                     <td>$<span x-text="o.total.toFixed(2)"></span></td>
-                                    <td x-text="new Date(o.created_at).toLocaleDateString()"></td>
+                                    <td x-text="new Date(o.created_ts * 1000).toLocaleDateString()"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -329,14 +329,18 @@
                                         <option value="shipped">Shipped</option>
                                         <option value="delivered">Delivered</option>
                                         <option value="cancelled">Cancelled</option>
+                                        <option value="refunded">Refunded</option>
                                     </select>
                                 </td>
                                 <td>$<span x-text="o.total.toFixed(2)"></span></td>
-                                <td x-text="new Date(o.created_at).toLocaleDateString()"></td>
+                                <td x-text="new Date(o.created_ts * 1000).toLocaleDateString()"></td>
                                 <td>
                                     <button class="btn btn-sm" @click="viewOrder(o)">VIEW</button>
-                                    <template x-if="!o.tracking_number && o.status !== 'pending'">
+                                    <template x-if="!o.tracking_number && o.status !== 'pending' && o.status !== 'refunded'">
                                         <button class="btn btn-sm btn-success" @click="openTrackingModal(o)">ADD TRACKING</button>
+                                    </template>
+                                    <template x-if="o.stripe_payment_intent_id && ['paid', 'processing', 'shipped', 'delivered'].includes(o.status)">
+                                        <button class="btn btn-sm btn-danger" @click="refundOrder(o)" style="background:#dc2626;">REFUND</button>
                                     </template>
                                 </td>
                             </tr>
@@ -1343,6 +1347,29 @@
                         await this.loadOrders();
                     } catch (e) {
                         console.error('Failed to update order status:', e);
+                    }
+                },
+
+                async refundOrder(order) {
+                    if (!confirm(`Refund $${order.total.toFixed(2)} for order ${order.id.substring(0, 8)}?\n\nThis will:\n- Issue a full refund via Stripe\n- Restore product stock\n- Send refund confirmation email`)) {
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`/gallium/api/orders/${order.id}/refund`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reason: 'requested_by_customer' })
+                        });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error || 'Refund failed');
+                        }
+                        const result = await res.json();
+                        alert(`Refund processed: $${(result.amount_cents / 100).toFixed(2)}`);
+                        await this.loadOrders();
+                    } catch (e) {
+                        alert('Refund failed: ' + e.message);
+                        console.error('Failed to refund order:', e);
                     }
                 },
 

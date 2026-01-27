@@ -79,9 +79,21 @@ async fn stripe_webhook(
                 .and_then(|m| m.get("order_id"))
                 .and_then(|v| v.as_str());
 
+            // Get payment_intent_id for linking refunds later
+            let payment_intent_id = event.data.object
+                .get("payment_intent")
+                .and_then(|v| v.as_str());
+
             if let Some(order_id) = order_id {
                 match Order::find_by_id(&conn, order_id).await {
                     Ok(Some(order)) => {
+                        // Store payment_intent_id for refund tracking
+                        if let Some(pi_id) = payment_intent_id {
+                            if let Err(e) = Order::set_payment_intent(&conn, &order.id, pi_id).await {
+                                tracing::error!("Failed to store payment_intent_id: {}", e);
+                            }
+                        }
+
                         // Update order status to paid
                         if let Err(e) = Order::update_status(&conn, &order.id, OrderStatus::Paid).await {
                             tracing::error!("Failed to update order status: {}", e);
@@ -117,6 +129,67 @@ async fn stripe_webhook(
                 }
             } else {
                 tracing::warn!("No order_id in checkout session metadata");
+            }
+        }
+        "refund.created" | "refund.updated" => {
+            // Get refund status
+            let refund_status = event.data.object
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            // Only process succeeded refunds
+            if refund_status != "succeeded" {
+                tracing::debug!("Refund not succeeded yet, status: {}", refund_status);
+                return (StatusCode::OK, Json(json!({"received": true})));
+            }
+
+            // Get payment_intent_id from refund
+            let payment_intent_id = event.data.object
+                .get("payment_intent")
+                .and_then(|v| v.as_str());
+
+            if let Some(pi_id) = payment_intent_id {
+                match Order::find_by_payment_intent(&conn, pi_id).await {
+                    Ok(Some(order)) => {
+                        // Update order status to refunded
+                        if let Err(e) = Order::update_status(&conn, &order.id, OrderStatus::Refunded).await {
+                            tracing::error!("Failed to update order status to refunded: {}", e);
+                        } else {
+                            tracing::info!("Order {} marked as refunded", order.id);
+                        }
+
+                        // Restore stock
+                        if let Ok(items) = Order::get_items(&conn, &order.id).await {
+                            for item in items {
+                                if let Err(e) = Product::increment_stock(&conn, &item.product_id, item.quantity).await {
+                                    tracing::error!("Failed to restore stock for product {}: {}", item.product_id, e);
+                                }
+                            }
+                            tracing::info!("Stock restored for order {}", order.id);
+                        }
+
+                        // Send refund confirmation email
+                        if let Some(ref email_service) = state.email {
+                            if let Some(ref user_id) = order.user_id {
+                                if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
+                                    let name = user.name.as_deref().unwrap_or("Customer");
+                                    let _ = email_service
+                                        .send_refund_confirmation(&user.email, &order, name)
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        tracing::warn!("Order not found for payment_intent: {}", pi_id);
+                    }
+                    Err(e) => {
+                        tracing::error!("Database error finding order by payment_intent: {}", e);
+                    }
+                }
+            } else {
+                tracing::warn!("No payment_intent in refund event");
             }
         }
         _ => {

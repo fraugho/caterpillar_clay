@@ -148,7 +148,8 @@ clay/
 │   ├── 012_product_notifications.sql
 │   ├── 013_product_styles.sql
 │   ├── 014_rename_polar_to_stripe.sql  # Renames polar_* columns to stripe_*
-│   └── 015_rename_easypost_to_shippo.sql  # Renames easypost_tracker_id to shippo_tracker_id
+│   ├── 015_rename_easypost_to_shippo.sql  # Renames easypost_tracker_id to shippo_tracker_id
+│   └── 016_add_payment_intent_id.sql  # Adds stripe_payment_intent_id for refunds
 ├── src/
 │   ├── main.rs             # Entry point
 │   ├── config.rs           # Environment config
@@ -197,11 +198,12 @@ cd clay
 cp .env.example .env
 ```
 
-Edit `.env` with your configuration. The app uses `TESTING_MODE` to switch between test and production credentials:
+Edit `.env` with your configuration. The app uses `TESTING_MODE` and `DEPLOY_MODE` to switch between environments:
 
 ```bash
 # Environment mode - switches which API keys/database to use
-TESTING_MODE=true  # true = test keys, false = production keys
+TESTING_MODE=true   # true = test keys, false = production keys
+DEPLOY_MODE=local   # local = development (Stripe CLI), cloud = production (webhooks active)
 
 # Database (Turso) - uses branching for test/prod separation
 DATABASE_URL_TEST=libsql://your-db-test.turso.io
@@ -219,10 +221,12 @@ CLERK_JWKS_URL=https://your-app.clerk.accounts.dev/.well-known/jwks.json
 # Stripe payments (get from stripe.com/dashboard)
 STRIPE_SECRET_KEY_TEST=sk_test_xxxxx
 STRIPE_PUBLISHABLE_KEY_TEST=pk_test_xxxxx
-STRIPE_WEBHOOK_SECRET_TEST=whsec_xxxxx
+# Webhook secrets: LOCAL from Stripe CLI, CLOUD from Dashboard
+STRIPE_WEBHOOK_SECRET_TEST_LOCAL=whsec_xxxxx   # From: stripe listen --forward-to localhost:3000/api/webhooks/stripe
+STRIPE_WEBHOOK_SECRET_TEST_CLOUD=whsec_xxxxx   # From: Stripe Dashboard test mode webhook
 STRIPE_SECRET_KEY_PROD=sk_live_xxxxx
 STRIPE_PUBLISHABLE_KEY_PROD=pk_live_xxxxx
-STRIPE_WEBHOOK_SECRET_PROD=whsec_xxxxx
+STRIPE_WEBHOOK_SECRET_PROD=whsec_xxxxx         # From: Stripe Dashboard live mode webhook
 
 # Shippo shipping (get from goshippo.com)
 SHIPPO_API_KEY_TEST=shippo_test_xxxxx
@@ -336,12 +340,13 @@ turso db create caterpillar-clay-test --from-db caterpillar-clay
 |--------|------|-------------|
 | id | TEXT PK | UUID |
 | user_id | TEXT FK | References users(id) |
-| status | TEXT | pending/paid/shipped/delivered |
+| status | TEXT | pending/paid/processing/shipped/delivered/refunded/cancelled |
 | total_cents | INTEGER | Order total in cents |
 | shipping_address | TEXT | JSON address object |
 | tracking_number | TEXT | Shipping tracking number |
 | shippo_tracker_id | TEXT | Shippo tracker ID |
 | stripe_session_id | TEXT | Stripe checkout session ID |
+| stripe_payment_intent_id | TEXT | Stripe payment intent ID (for refunds) |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
 
@@ -483,6 +488,7 @@ curl -X POST http://localhost:3000/admin/api/products \
 | GET | `/gallium/orders` | All orders |
 | PUT | `/gallium/orders/:id/status` | Update status |
 | POST | `/gallium/orders/:id/tracking` | Add tracking |
+| POST | `/gallium/orders/:id/refund` | Process refund via Stripe |
 | GET | `/gallium/dashboard` | Stats overview |
 | GET | `/gallium/settings/artist` | Get artist info |
 | PUT | `/gallium/settings/artist` | Update artist description |
@@ -542,8 +548,10 @@ stripe listen --forward-to localhost:3000/webhooks/stripe
 
 ### Webhook Events
 
-Configure your webhook endpoint at `https://yourdomain.com/webhooks/stripe` to receive:
-- `checkout.session.completed` - Payment successful, order marked as paid
+Configure your webhook endpoint at `https://caterpillarclay.com/api/webhooks/stripe` to receive:
+- `checkout.session.completed` - Payment successful, order marked as paid, stock decremented
+- `refund.created` - Refund initiated, order marked as refunded, stock restored
+- `refund.updated` - Refund status updated
 
 ## Deployment
 
@@ -559,6 +567,7 @@ cargo build --release
 - Configure proper SMTP credentials
 - Set up webhook endpoints in Stripe and Shippo dashboards
 - Set `TESTING_MODE=false`
+- Set `DEPLOY_MODE=cloud`
 
 ### Running with systemd
 

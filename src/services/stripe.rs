@@ -3,7 +3,8 @@ use stripe::{
     CreateCheckoutSessionLineItems, CreateCheckoutSessionLineItemsPriceData,
     CreateCheckoutSessionLineItemsPriceDataProductData, CreateCheckoutSessionShippingAddressCollection,
     CreateCheckoutSessionShippingAddressCollectionAllowedCountries, CreatePrice,
-    CreateProduct, Currency, IdOrCreate, Price, Product as StripeProduct, UpdatePrice, UpdateProduct,
+    CreateProduct, CreateRefund, Currency, IdOrCreate, Price, Product as StripeProduct,
+    Refund, UpdatePrice, UpdateProduct,
 };
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -205,6 +206,46 @@ impl StripeService {
         })
     }
 
+    /// Create a refund for a payment intent
+    /// Returns the refund ID if successful
+    pub async fn create_refund(
+        &self,
+        payment_intent_id: &str,
+        amount_cents: Option<i64>,
+        reason: Option<&str>,
+    ) -> AppResult<RefundResult> {
+        let pi_id: stripe::PaymentIntentId = payment_intent_id.parse().map_err(|_| {
+            AppError::ExternalService("Invalid payment intent ID".to_string())
+        })?;
+
+        let mut params = CreateRefund::default();
+        params.payment_intent = Some(pi_id);
+
+        // If amount is specified, do partial refund; otherwise full refund
+        if let Some(amount) = amount_cents {
+            params.amount = Some(amount);
+        }
+
+        // Map reason string to Stripe RefundReasonFilter enum
+        if let Some(r) = reason {
+            params.reason = match r {
+                "duplicate" => Some(stripe::RefundReasonFilter::Duplicate),
+                "fraudulent" => Some(stripe::RefundReasonFilter::Fraudulent),
+                _ => Some(stripe::RefundReasonFilter::RequestedByCustomer),
+            };
+        }
+
+        let refund = Refund::create(&self.client, params)
+            .await
+            .map_err(|e| AppError::ExternalService(format!("Stripe refund error: {}", e)))?;
+
+        Ok(RefundResult {
+            id: refund.id.to_string(),
+            status: refund.status.map(|s| format!("{:?}", s).to_lowercase()).unwrap_or_default(),
+            amount: refund.amount,
+        })
+    }
+
     /// Verify webhook signature and parse event
     pub fn verify_webhook(&self, payload: &str, signature: &str) -> AppResult<StripeWebhookEvent> {
         // Parse the Stripe-Signature header
@@ -285,4 +326,10 @@ pub struct CheckoutItem {
 pub struct CheckoutSessionResult {
     pub id: String,
     pub url: String,
+}
+
+pub struct RefundResult {
+    pub id: String,
+    pub status: String,
+    pub amount: i64,
 }

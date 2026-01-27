@@ -150,6 +150,47 @@ impl EmailService {
         self.send_email(to_email, &subject, &body).await
     }
 
+    pub async fn send_refund_confirmation(
+        &self,
+        to_email: &str,
+        order: &Order,
+        customer_name: &str,
+    ) -> AppResult<()> {
+        let subject = format!("Refund Processed - #{}", &order.id[..8]);
+
+        let body = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: 'Courier New', monospace; background: #f0e6d2; padding: 20px; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 32px; }}
+        h1 {{ color: #8b5e3c; font-size: 18px; }}
+        .total {{ font-size: 16px; color: #22c55e; margin-top: 20px; }}
+        .footer {{ margin-top: 32px; font-size: 10px; color: #888; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Your refund has been processed</h1>
+        <p>Hi {},</p>
+        <p>We've processed a refund for your order.</p>
+        <p class="total">Refund Amount: ${:.2}</p>
+        <p>The refund should appear on your statement within 5-10 business days, depending on your bank.</p>
+        <p>If you have any questions, please don't hesitate to reach out.</p>
+        <div class="footer">
+            <p>Caterpillar Clay - Handmade Pottery</p>
+        </div>
+    </div>
+</body>
+</html>"#,
+            customer_name,
+            order.total_cents as f64 / 100.0
+        );
+
+        self.send_email(to_email, &subject, &body).await
+    }
+
     async fn send_email(&self, to: &str, subject: &str, html_body: &str) -> AppResult<()> {
         let email = Message::builder()
             .from(

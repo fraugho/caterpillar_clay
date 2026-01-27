@@ -1,5 +1,24 @@
 use std::env;
 
+#[derive(Clone, PartialEq)]
+pub enum DeployMode {
+    Local,
+    Cloud,
+}
+
+impl DeployMode {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "cloud" | "production" | "prod" => DeployMode::Cloud,
+            _ => DeployMode::Local,
+        }
+    }
+
+    pub fn is_cloud(&self) -> bool {
+        matches!(self, DeployMode::Cloud)
+    }
+}
+
 #[derive(Clone)]
 pub struct Config {
     pub database_url: String,
@@ -26,6 +45,7 @@ pub struct Config {
     pub base_url: String,
     pub port: u16,
     pub testing_mode: bool,
+    pub deploy_mode: DeployMode,
     // Rate limiting (requests per minute)
     pub rate_limit_general: u32,
     pub rate_limit_auth: u32,
@@ -41,6 +61,11 @@ impl Config {
         let testing_mode = env::var("TESTING_MODE")
             .unwrap_or_else(|_| "false".to_string())
             .to_lowercase() == "true";
+
+        // Deploy mode: local (development) vs cloud (production with webhooks)
+        let deploy_mode = DeployMode::from_str(
+            &env::var("DEPLOY_MODE").unwrap_or_else(|_| "local".to_string())
+        );
 
         let suffix = if testing_mode { "_TEST" } else { "_PROD" };
 
@@ -71,8 +96,23 @@ impl Config {
             stripe_secret_key: get_env("STRIPE_SECRET_KEY")?,
             stripe_publishable_key: get_env_optional("STRIPE_PUBLISHABLE_KEY")
                 .unwrap_or_default(),
-            stripe_webhook_secret: get_env_optional("STRIPE_WEBHOOK_SECRET")
-                .unwrap_or_default(),
+            stripe_webhook_secret: {
+                // Webhook secret depends on both testing_mode and deploy_mode
+                // TEST_LOCAL, TEST_CLOUD, or PROD
+                let deploy_suffix = match &deploy_mode {
+                    DeployMode::Local => "_LOCAL",
+                    DeployMode::Cloud => "_CLOUD",
+                };
+                if testing_mode {
+                    env::var(format!("STRIPE_WEBHOOK_SECRET_TEST{}", deploy_suffix))
+                        .or_else(|_| env::var("STRIPE_WEBHOOK_SECRET_TEST"))
+                        .unwrap_or_default()
+                } else {
+                    // Production only uses cloud (no local suffix for prod)
+                    env::var("STRIPE_WEBHOOK_SECRET_PROD")
+                        .unwrap_or_default()
+                }
+            },
             shippo_api_key: get_env("SHIPPO_API_KEY")?,
             smtp_host: env::var("SMTP_HOST").unwrap_or_else(|_| "smtp.resend.com".to_string()),
             smtp_user: env::var("SMTP_USER").unwrap_or_else(|_| "resend".to_string()),
@@ -93,6 +133,7 @@ impl Config {
                 .parse()
                 .unwrap_or(3000),
             testing_mode,
+            deploy_mode,
             rate_limit_general: env::var("RATE_LIMIT_GENERAL")
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
