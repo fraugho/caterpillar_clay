@@ -18,10 +18,15 @@ use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Debug output to stderr (Cloud Run captures this)
+    eprintln!("=== Caterpillar Clay starting ===");
+
     // Install rustls crypto provider before any TLS connections
+    eprintln!("Installing rustls crypto provider...");
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("Failed to install rustls crypto provider");
+    eprintln!("Rustls crypto provider installed");
 
     // Initialize tracing
     tracing_subscriber::registry()
@@ -33,10 +38,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // Load environment variables
+    eprintln!("Loading environment variables...");
     dotenvy::dotenv().ok();
 
     // Load configuration
+    eprintln!("Loading configuration...");
     let config = Config::from_env().expect("Failed to load configuration");
+    eprintln!("Configuration loaded, port={}", config.port);
 
     if config.testing_mode {
         tracing::warn!("TESTING MODE - Using test API keys and database");
@@ -45,9 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create database connection
+    eprintln!("Connecting to database: {}...", &config.database_url[..50.min(config.database_url.len())]);
     let db = db::create_database(&config.database_url, config.turso_auth_token.as_deref())
         .await
         .expect("Failed to create database");
+    eprintln!("Database connected");
 
     tracing::info!("Connected to database");
 
