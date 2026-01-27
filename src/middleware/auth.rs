@@ -48,18 +48,36 @@ pub async fn auth_middleware(
 ) -> Response {
     tracing::debug!("AUTH MIDDLEWARE CALLED for {}", req.uri());
 
+    // Try Authorization header first (for API calls from frontend)
     let auth_header = req
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "));
 
-    let token = match auth_header {
+    // Fall back to __session cookie (for browser navigation)
+    let cookie_token = req
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|cookies| {
+            cookies.split(';')
+                .find_map(|cookie| {
+                    let cookie = cookie.trim();
+                    if cookie.starts_with("__session=") {
+                        Some(cookie.trim_start_matches("__session="))
+                    } else {
+                        None
+                    }
+                })
+        });
+
+    let token = match auth_header.or(cookie_token) {
         Some(t) => t,
         None => {
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "Missing authorization header"})),
+                Json(json!({"error": "Missing authorization"})),
             )
                 .into_response();
         }
