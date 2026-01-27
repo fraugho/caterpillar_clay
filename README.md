@@ -396,11 +396,11 @@ The server will start on `http://localhost:3000`.
 ### Making a User Admin
 
 ```bash
-# Find your user
-sqlite3 caterpillar_clay.db "SELECT * FROM users;"
+# Find your user (use catepillar-clay-test for test, catepillar-clay for prod)
+turso db shell catepillar-clay "SELECT * FROM users;"
 
 # Make them admin
-sqlite3 caterpillar_clay.db "UPDATE users SET is_admin = 1 WHERE email = 'your@email.com';"
+turso db shell catepillar-clay "UPDATE users SET is_admin = 1 WHERE email = 'your@email.com';"
 ```
 
 ### Adding Products via Admin API
