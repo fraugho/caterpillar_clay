@@ -423,11 +423,11 @@ The server will start on `http://localhost:3000`.
 ### Making a User Admin
 
 ```bash
-# Find your user (use catepillar-clay-test for test, catepillar-clay for prod)
-turso db shell catepillar-clay "SELECT * FROM users;"
+# Find your user (use caterpillar-clay-test for test, caterpillar-clay for prod)
+turso db shell caterpillar-clay "SELECT * FROM users;"
 
 # Make them admin
-turso db shell catepillar-clay "UPDATE users SET is_admin = 1 WHERE email = 'your@email.com';"
+turso db shell caterpillar-clay "UPDATE users SET is_admin = 1 WHERE email = 'your@email.com';"
 ```
 
 ### Adding Products via Admin API

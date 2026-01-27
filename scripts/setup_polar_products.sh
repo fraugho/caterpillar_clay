@@ -129,7 +129,7 @@ done
 
 echo ""
 echo "To run via turso CLI:"
-echo "turso db shell catepillar-clay"
+echo "turso db shell caterpillar-clay"
 echo ""
 echo "Then paste the UPDATE commands above."
 echo ""
