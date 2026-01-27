@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.env
+.env.*
+*.db
+*.db-*
+caterpillar_clay.db*
+README.md
+CLAUDE.md
+.gitignore
+.dockerignore
