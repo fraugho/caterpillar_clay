@@ -8,7 +8,7 @@ pub mod settings;
 pub mod shipping;
 pub mod webhooks;
 
-use axum::{middleware, Router};
+use axum::{middleware, response::Redirect, routing::get, Router};
 use libsql::Database;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -63,10 +63,12 @@ pub fn create_router(state: AppState) -> Router {
         .merge(cart::routes())
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
 
-    if state.config.testing_mode && !state.config.deploy_mode.is_cloud() {
+    // Admin auth is checked directly in handler (bypasses middleware issues with nested routers)
+    let skip_admin_auth = state.config.testing_mode && !state.config.deploy_mode.is_cloud();
+    if skip_admin_auth {
         tracing::warn!("TESTING MODE (local) - Admin auth is disabled!");
     } else if state.config.testing_mode {
-        tracing::info!("TESTING MODE (cloud) - Admin auth is enabled");
+        tracing::info!("TESTING MODE (cloud) - Admin auth is ENABLED (checked in handler)");
     }
 
     let admin_routes = admin::routes(state.clone());
@@ -77,9 +79,12 @@ pub fn create_router(state: AppState) -> Router {
         .merge(protected_routes)
         .layer(middleware::from_fn_with_state(state.clone(), rate_limit_middleware));
 
+    // Admin files are in admin_static/ (not static/) so fallback won't serve them
+    // Explicit redirect for /gallium/ to /gallium (trailing slash handling)
     Router::new()
         .nest("/api/webhooks", webhook_routes) // Webhooks exempt from rate limiting
         .nest("/api", rate_limited_api)
+        .route("/gallium/", get(|| async { Redirect::permanent("/gallium") }))
         .nest("/gallium", admin_routes)
         .nest_service("/uploads", ServeDir::new(&state.config.upload_dir))
         .fallback_service(

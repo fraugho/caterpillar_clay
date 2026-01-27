@@ -46,6 +46,8 @@ pub async fn auth_middleware(
     mut req: Request<Body>,
     next: Next,
 ) -> Response {
+    tracing::debug!("AUTH MIDDLEWARE CALLED for {}", req.uri());
+
     let auth_header = req
         .headers()
         .get(header::AUTHORIZATION)

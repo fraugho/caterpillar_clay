@@ -7,6 +7,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
 COPY src ./src
 COPY static ./static
+COPY admin_static ./admin_static
 COPY migrations ./migrations
 
 # Build release binary

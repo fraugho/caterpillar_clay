@@ -17,9 +17,10 @@ use crate::middleware::auth::{auth_middleware, require_admin};
 use crate::routes::AppState;
 
 async fn serve_admin_static(path: Option<Path<String>>) -> impl IntoResponse {
+    // Admin files are in admin_static/ (NOT static/) to avoid fallback_service conflicts
     let file_path = match &path {
-        Some(Path(p)) if !p.is_empty() => format!("static/gallium/{}", p),
-        _ => "static/gallium/index.html".to_string(),
+        Some(Path(p)) if !p.is_empty() => format!("admin_static/{}", p),
+        _ => "admin_static/index.html".to_string(),
     };
 
     match tokio::fs::read(&file_path).await {
@@ -43,7 +44,7 @@ async fn serve_admin_static(path: Option<Path<String>>) -> impl IntoResponse {
         }
         Err(_) => {
             // SPA fallback - serve index.html for client-side routing
-            match tokio::fs::read("static/gallium/index.html").await {
+            match tokio::fs::read("admin_static/index.html").await {
                 Ok(contents) => {
                     (StatusCode::OK, [(header::CONTENT_TYPE, "text/html")], contents).into_response()
                 }
