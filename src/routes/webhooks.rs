@@ -215,7 +215,7 @@ async fn shippo_webhook(
         }
     };
 
-    tracing::info!("Received Shippo webhook: {}", event.event);
+    tracing::info!("Received Shippo webhook: {} (test: {})", event.event, event.test);
 
     let conn = match state.db.connect() {
         Ok(c) => c,
@@ -225,51 +225,73 @@ async fn shippo_webhook(
         }
     };
 
-    let tracking_data = &event.data;
+    match event.event.as_str() {
+        "track_updated" => {
+            if let Some(tracking_data) = event.as_tracking() {
+                // Find order by tracking number
+                let orders = match Order::list_all(&conn).await {
+                    Ok(o) => o,
+                    Err(e) => {
+                        tracing::error!("Database error: {}", e);
+                        return (StatusCode::OK, Json(json!({"received": true})));
+                    }
+                };
 
-    // Find order by tracking number
-    let orders = match Order::list_all(&conn).await {
-        Ok(o) => o,
-        Err(e) => {
-            tracing::error!("Database error: {}", e);
-            return (StatusCode::OK, Json(json!({"received": true})));
-        }
-    };
+                let order = orders
+                    .into_iter()
+                    .find(|o| o.tracking_number.as_deref() == Some(&tracking_data.tracking_number));
 
-    let order = orders
-        .into_iter()
-        .find(|o| o.tracking_number.as_deref() == Some(&tracking_data.tracking_number));
+                if let Some(order) = order {
+                    let shippo_status = tracking_data
+                        .tracking_status
+                        .as_ref()
+                        .map(|s| s.status.as_str())
+                        .unwrap_or("");
 
-    if let Some(order) = order {
-        let shippo_status = tracking_data
-            .tracking_status
-            .as_ref()
-            .map(|s| s.status.as_str())
-            .unwrap_or("");
+                    let order_status = ShippoService::map_status_to_order_status(shippo_status);
+                    let new_status = OrderStatus::from_str(order_status);
 
-        let order_status = ShippoService::map_status_to_order_status(shippo_status);
-        let new_status = OrderStatus::from_str(order_status);
+                    if let Some(status) = new_status {
+                        if let Err(e) = Order::update_status(&conn, &order.id, status).await {
+                            tracing::error!("Failed to update order status: {}", e);
+                        } else {
+                            tracing::info!("Order {} status updated to {:?}", order.id, status);
 
-        if let Some(status) = new_status {
-            if let Err(e) = Order::update_status(&conn, &order.id, status).await {
-                tracing::error!("Failed to update order status: {}", e);
-            } else {
-                tracing::info!("Order {} status updated to {:?}", order.id, status);
-
-                // Send delivery email
-                if status == OrderStatus::Delivered {
-                    if let Some(ref email_service) = state.email {
-                        if let Some(ref user_id) = order.user_id {
-                            if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
-                                let name = user.name.as_deref().unwrap_or("Customer");
-                                let _ = email_service
-                                    .send_order_delivered(&user.email, &order, name)
-                                    .await;
+                            // Send delivery email
+                            if status == OrderStatus::Delivered {
+                                if let Some(ref email_service) = state.email {
+                                    if let Some(ref user_id) = order.user_id {
+                                        if let Ok(Some(user)) = User::find_by_id(&conn, user_id).await {
+                                            let name = user.name.as_deref().unwrap_or("Customer");
+                                            let _ = email_service
+                                                .send_order_delivered(&user.email, &order, name)
+                                                .await;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+        "transaction_created" | "transaction_updated" => {
+            if let Some(transaction) = event.as_transaction() {
+                tracing::info!(
+                    "Transaction {} status: {}, tracking: {:?}",
+                    transaction.object_id,
+                    transaction.status,
+                    transaction.tracking_number
+                );
+                // Transaction events are handled synchronously via the API response
+                // These webhooks are mainly for async label purchases which we don't use
+            }
+        }
+        "batch_created" | "batch_purchased" => {
+            tracing::debug!("Batch event: {} - not handled", event.event);
+        }
+        _ => {
+            tracing::debug!("Unhandled Shippo event type: {}", event.event);
         }
     }
 

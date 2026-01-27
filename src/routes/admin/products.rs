@@ -56,6 +56,11 @@ pub struct AdminProductResponse {
     pub stripe_price_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
+    // Shipping dimensions
+    pub weight_grams: Option<i32>,
+    pub length_cm: Option<f64>,
+    pub width_cm: Option<f64>,
+    pub height_cm: Option<f64>,
 }
 
 impl AdminProductResponse {
@@ -107,6 +112,11 @@ impl AdminProductResponse {
             stripe_price_id: product.stripe_price_id,
             created_ts: product.created_ts,
             updated_ts: product.updated_ts,
+            // Shipping dimensions
+            weight_grams: product.weight_grams,
+            length_cm: product.length_cm,
+            width_cm: product.width_cm,
+            height_cm: product.height_cm,
         }
     }
 }
@@ -223,6 +233,10 @@ async fn batch_update_products(
             is_active: Some(update.is_active),
             image_path: None,
             stripe_price_id: None,
+            weight_grams: None,
+            length_cm: None,
+            width_cm: None,
+            height_cm: None,
         };
 
         let mut product = match Product::update(&conn, &update.id, update_data).await {

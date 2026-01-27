@@ -142,6 +142,11 @@ pub struct Product {
     pub stripe_product_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
+    // Shipping dimensions
+    pub weight_grams: Option<i32>,
+    pub length_cm: Option<f64>,
+    pub width_cm: Option<f64>,
+    pub height_cm: Option<f64>,
 }
 
 impl Product {
@@ -162,6 +167,11 @@ impl Product {
             stripe_product_id: row.get(10)?,
             created_ts: row.get(11)?,
             updated_ts: row.get(12)?,
+            // Shipping dimensions (columns 13-16 after migration)
+            weight_grams: row.get(13).ok(),
+            length_cm: row.get(14).ok(),
+            width_cm: row.get(15).ok(),
+            height_cm: row.get(16).ok(),
         })
     }
 }
@@ -172,6 +182,11 @@ pub struct CreateProduct {
     pub description: Option<String>,
     pub price_cents: i32,
     pub stock_quantity: Option<i32>,
+    // Shipping dimensions
+    pub weight_grams: Option<i32>,
+    pub length_cm: Option<f64>,
+    pub width_cm: Option<f64>,
+    pub height_cm: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -183,6 +198,11 @@ pub struct UpdateProduct {
     pub stock_quantity: Option<i32>,
     pub is_active: Option<bool>,
     pub stripe_price_id: Option<String>,
+    // Shipping dimensions
+    pub weight_grams: Option<i32>,
+    pub length_cm: Option<f64>,
+    pub width_cm: Option<f64>,
+    pub height_cm: Option<f64>,
 }
 
 impl Product {
@@ -235,8 +255,8 @@ impl Product {
             .as_secs() as i64;
 
         conn.execute(
-            "INSERT INTO products (id, name, description, price_cents, stock_quantity, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            libsql::params![id.clone(), data.name, data.description, data.price_cents, data.stock_quantity.unwrap_or(0), now, now],
+            "INSERT INTO products (id, name, description, price_cents, stock_quantity, created_ts, updated_ts, weight_grams, length_cm, width_cm, height_cm) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.name, data.description, data.price_cents, data.stock_quantity.unwrap_or(0), now, now, data.weight_grams, data.length_cm, data.width_cm, data.height_cm],
         )
         .await
         .map_err(AppError::from)?;
@@ -258,6 +278,11 @@ impl Product {
         let stock_quantity = data.stock_quantity.unwrap_or(current.stock_quantity);
         let is_active = data.is_active.unwrap_or(current.is_active) as i32;
         let stripe_price_id = data.stripe_price_id.or(current.stripe_price_id);
+        // Shipping dimensions - use provided value or keep current
+        let weight_grams = data.weight_grams.or(current.weight_grams);
+        let length_cm = data.length_cm.or(current.length_cm);
+        let width_cm = data.width_cm.or(current.width_cm);
+        let height_cm = data.height_cm.or(current.height_cm);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -273,10 +298,14 @@ impl Product {
                 stock_quantity = ?,
                 is_active = ?,
                 stripe_price_id = ?,
-                updated_ts = ?
+                updated_ts = ?,
+                weight_grams = ?,
+                length_cm = ?,
+                width_cm = ?,
+                height_cm = ?
             WHERE id = ?
             "#,
-            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, stripe_price_id, now, id.to_string()],
+            libsql::params![name, description, price_cents, image_path, stock_quantity, is_active, stripe_price_id, now, weight_grams, length_cm, width_cm, height_cm, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

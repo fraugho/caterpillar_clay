@@ -11,5 +11,5 @@ pub use order::{CreateOrder, CreateOrderItem, Order, OrderItem, OrderStatus, Shi
 pub use product::{CreateProduct, Product, ProductImage, UpdateProduct};
 pub use product_notification::ProductNotification;
 pub use product_style::ProductStyle;
-pub use settings::{ArtistInfo, Setting};
+pub use settings::{ArtistInfo, Setting, ShopAddress};
 pub use user::{CreateUser, User};

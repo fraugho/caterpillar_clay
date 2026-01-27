@@ -409,7 +409,7 @@
             <div class="card" style="padding:32px">
                 <h2 style="font-size:14px;margin-bottom:24px">Checkout</h2>
                 <div style="display:flex;align-items:center;justify-content:center;margin-bottom:32px;gap:8px">
-                    <template x-for="i in 4" :key="i">
+                    <template x-for="i in 5" :key="i">
                         <div :style="`width:24px;height:24px;background:${i<=step?'var(--accent)':'var(--border)'};border-radius:50%;transition:background .3s`"></div>
                     </template>
                 </div>
@@ -433,7 +433,7 @@
                     </div>
                 </template>
 
-                <!-- Step 2: Shipping -->
+                <!-- Step 2: Shipping Address -->
                 <template x-if="step==2">
                     <div>
                         <p style="font-size:10px;margin-bottom:16px">Step 2: Shipping Address</p>
@@ -447,14 +447,49 @@
                             <input type="text" x-model="shipping.zip" placeholder="ZIP Code">
                             <input type="text" x-model="shipping.country" placeholder="Country" value="USA">
                         </div>
-                        <button class="btn" @click="step=3" :disabled="!isShippingValid">NEXT</button>
+                        <button class="btn" @click="fetchShippingRates()" :disabled="!isShippingValid || loadingShippingRates">
+                            <span x-text="loadingShippingRates ? 'CALCULATING SHIPPING...' : 'NEXT'"></span>
+                        </button>
                     </div>
                 </template>
 
-                <!-- Step 3: Review -->
+                <!-- Step 3: Shipping Method -->
                 <template x-if="step==3">
                     <div>
-                        <p style="font-size:10px;margin-bottom:16px">Step 3: Review Order</p>
+                        <p style="font-size:10px;margin-bottom:16px">Step 3: Select Shipping Method</p>
+                        <template x-if="shippingRates.length === 0 && !loadingShippingRates">
+                            <div>
+                                <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px">No shipping rates available. Please check your address.</p>
+                                <button class="btn" style="background:var(--border);color:var(--text-primary)" @click="step=2">BACK</button>
+                            </div>
+                        </template>
+                        <template x-if="shippingRates.length > 0">
+                            <div>
+                                <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+                                    <template x-for="rate in shippingRates" :key="rate.rate_id">
+                                        <label style="display:flex;align-items:center;gap:12px;padding:16px;background:var(--bg-secondary);border:2px solid var(--border);border-radius:8px;cursor:none" :style="{ borderColor: selectedShippingRate && selectedShippingRate.rate_id === rate.rate_id ? 'var(--accent)' : 'var(--border)' }" @click="selectedShippingRate = rate">
+                                            <input type="radio" name="shipping_rate" :value="rate.rate_id" :checked="selectedShippingRate && selectedShippingRate.rate_id === rate.rate_id" style="width:auto;margin:0">
+                                            <div style="flex:1">
+                                                <p style="font-size:9px;margin-bottom:4px"><span x-text="rate.carrier"></span> - <span x-text="rate.service"></span></p>
+                                                <p style="font-size:7px;color:var(--text-secondary)" x-text="rate.estimated_days ? 'Est. ' + rate.estimated_days + ' days' : rate.duration_terms || ''"></p>
+                                            </div>
+                                            <p style="font-size:10px;color:var(--accent)">$<span x-text="(rate.price_cents / 100).toFixed(2)"></span></p>
+                                        </label>
+                                    </template>
+                                </div>
+                                <div style="display:flex;gap:12px">
+                                    <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="step=2">BACK</button>
+                                    <button class="btn" style="flex:1" @click="step=4" :disabled="!selectedShippingRate">NEXT</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Step 4: Review -->
+                <template x-if="step==4">
+                    <div>
+                        <p style="font-size:10px;margin-bottom:16px">Step 4: Review Order</p>
                         <div style="margin-bottom:16px">
                             <template x-for="item in cart" :key="item.id + ':' + (item.styleId || '')">
                                 <p style="font-size:8px;margin-bottom:4px">
@@ -465,16 +500,31 @@
                             </template>
                         </div>
                         <p style="font-size:10px;margin-bottom:8px">Shipping to:</p>
-                        <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px" x-text="`${shipping.name}, ${shipping.street}, ${shipping.city}, ${shipping.state} ${shipping.zip}`"></p>
-                        <p style="font-size:12px;margin-bottom:16px;color:var(--accent)">Total: $<span x-text="cartTotal.toFixed(2)"></span></p>
-                        <button class="btn" @click="placeOrder()" :disabled="processingOrder">
-                            <span x-text="processingOrder ? 'PROCESSING...' : 'PLACE ORDER'"></span>
-                        </button>
+                        <p style="font-size:8px;color:var(--text-secondary);margin-bottom:12px" x-text="`${shipping.name}, ${shipping.street}, ${shipping.city}, ${shipping.state} ${shipping.zip}`"></p>
+                        <template x-if="selectedShippingRate">
+                            <div style="margin-bottom:16px">
+                                <p style="font-size:10px;margin-bottom:8px">Shipping Method:</p>
+                                <p style="font-size:8px;color:var(--text-secondary)" x-text="`${selectedShippingRate.carrier} - ${selectedShippingRate.service}`"></p>
+                            </div>
+                        </template>
+                        <div style="border-top:2px dashed var(--border);padding-top:16px;margin-bottom:16px">
+                            <p style="font-size:9px;margin-bottom:8px">Subtotal: $<span x-text="cartTotal.toFixed(2)"></span></p>
+                            <template x-if="selectedShippingRate">
+                                <p style="font-size:9px;margin-bottom:8px">Shipping: $<span x-text="(selectedShippingRate.price_cents / 100).toFixed(2)"></span></p>
+                            </template>
+                            <p style="font-size:12px;color:var(--accent)">Total: $<span x-text="orderTotal.toFixed(2)"></span></p>
+                        </div>
+                        <div style="display:flex;gap:12px">
+                            <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="step=3">BACK</button>
+                            <button class="btn" style="flex:1" @click="placeOrder()" :disabled="processingOrder">
+                                <span x-text="processingOrder ? 'PROCESSING...' : 'PLACE ORDER'"></span>
+                            </button>
+                        </div>
                     </div>
                 </template>
 
-                <!-- Step 4: Complete -->
-                <template x-if="step==4">
+                <!-- Step 5: Complete -->
+                <template x-if="step==5">
                     <div style="text-align:center">
                         <p style="font-size:12px;margin-bottom:8px">Order Complete!</p>
                         <p style="font-size:8px;color:var(--text-secondary);margin-bottom:16px">The caterpillar is happy</p>
@@ -561,6 +611,9 @@
                 selectedProduct:null,
                 pendingProductId:null,
                 shipping:{name:'',street:'',city:'',state:'',zip:'',country:'USA'},
+                shippingRates:[],
+                selectedShippingRate:null,
+                loadingShippingRates:false,
                 notifyEmail:'',
                 notifyProductId:null,
                 notifyStyleIds:[],
@@ -571,6 +624,12 @@
 
                 get cartTotal(){
                     return this.cart.reduce((a,b)=>a+(b.price * b.quantity),0);
+                },
+
+                get orderTotal(){
+                    const subtotal = this.cartTotal;
+                    const shipping = this.selectedShippingRate ? this.selectedShippingRate.price_cents / 100 : 0;
+                    return subtotal + shipping;
                 },
 
                 get cartItemCount(){
@@ -916,6 +975,39 @@
                     this.loadingOrders = false;
                 },
 
+                async fetchShippingRates(){
+                    this.loadingShippingRates = true;
+                    this.shippingRates = [];
+                    this.selectedShippingRate = null;
+                    try {
+                        const items = this.cart.map(p => ({ product_id: p.id, quantity: p.quantity }));
+                        const res = await fetch('/api/shipping/rates', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                items: items,
+                                destination: this.shipping
+                            })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.shippingRates = data.rates || [];
+                            // Auto-select first rate
+                            if (this.shippingRates.length > 0) {
+                                this.selectedShippingRate = this.shippingRates[0];
+                            }
+                            this.step = 3;
+                        } else {
+                            const err = await res.json();
+                            alert(err.error || 'Failed to get shipping rates');
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch shipping rates:', e);
+                        alert('Failed to calculate shipping. Please try again.');
+                    }
+                    this.loadingShippingRates = false;
+                },
+
                 addToCart(product){
                     const existing = this.cart.find(c => c.id === product.id);
                     if(existing){
@@ -938,16 +1030,27 @@
                         const token = await window.Clerk.session.getToken();
                         const items = this.cart.map(p=>({product_id:p.id,quantity:p.quantity}));
 
+                        const checkoutData = {
+                            items,
+                            shipping_address: this.shipping
+                        };
+
+                        // Include shipping rate details if selected
+                        if (this.selectedShippingRate) {
+                            checkoutData.shipping_rate_id = this.selectedShippingRate.rate_id;
+                            checkoutData.shipping_cents = this.selectedShippingRate.price_cents;
+                            checkoutData.shipping_carrier = this.selectedShippingRate.carrier;
+                            checkoutData.shipping_service = this.selectedShippingRate.service;
+                            checkoutData.estimated_delivery_days = this.selectedShippingRate.estimated_days;
+                        }
+
                         const res = await fetch('/api/checkout',{
                             method:'POST',
                             headers:{
                                 'Content-Type':'application/json',
                                 'Authorization':`Bearer ${token}`
                             },
-                            body:JSON.stringify({
-                                items,
-                                shipping_address:this.shipping
-                            })
+                            body:JSON.stringify(checkoutData)
                         });
 
                         if(res.ok){
@@ -957,7 +1060,7 @@
                             } else {
                                 this.cart = [];
                                 localStorage.removeItem('cart');
-                                this.step = 4;
+                                this.step = 5;
                                 this.orderMessage = 'Your order has been placed!';
                                 await this.loadOrders();
                             }

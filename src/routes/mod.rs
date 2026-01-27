@@ -5,6 +5,7 @@ pub mod newsletter;
 pub mod orders;
 pub mod products;
 pub mod settings;
+pub mod shipping;
 pub mod webhooks;
 
 use axum::{middleware, Router};
@@ -54,7 +55,8 @@ pub fn create_router(state: AppState) -> Router {
         .merge(products::public_routes())
         .merge(auth::routes())
         .merge(settings::routes())
-        .merge(newsletter::routes());
+        .merge(newsletter::routes())
+        .merge(shipping::routes());
 
     let protected_routes = Router::new()
         .merge(orders::routes())

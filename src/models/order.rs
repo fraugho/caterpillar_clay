@@ -66,6 +66,13 @@ pub struct Order {
     pub stripe_payment_intent_id: Option<String>,
     pub created_ts: i64,
     pub updated_ts: i64,
+    // Shipping details
+    pub shipping_cents: i32,
+    pub shipping_carrier: Option<String>,
+    pub shipping_service: Option<String>,
+    pub estimated_delivery_days: Option<i32>,
+    // Label from Shippo
+    pub label_url: Option<String>,
 }
 
 impl Order {
@@ -82,6 +89,13 @@ impl Order {
             stripe_payment_intent_id: row.get(12)?,
             created_ts: row.get(10)?,
             updated_ts: row.get(11)?,
+            // Shipping details (columns 13-16 after migration)
+            shipping_cents: row.get(13).unwrap_or(0),
+            shipping_carrier: row.get(14).ok(),
+            shipping_service: row.get(15).ok(),
+            estimated_delivery_days: row.get(16).ok(),
+            // Label URL (column 17 after migration 020)
+            label_url: row.get(17).ok(),
         })
     }
 }
@@ -121,6 +135,11 @@ pub struct CreateOrder {
     pub shipping_address: ShippingAddress,
     pub stripe_session_id: Option<String>,
     pub items: Vec<CreateOrderItem>,
+    // Shipping details
+    pub shipping_cents: Option<i32>,
+    pub shipping_carrier: Option<String>,
+    pub shipping_service: Option<String>,
+    pub estimated_delivery_days: Option<i32>,
 }
 
 impl Order {
@@ -227,8 +246,8 @@ impl Order {
             .map_err(|e| AppError::Internal(e.to_string()))?;
 
         conn.execute(
-            "INSERT INTO orders (id, user_id, total_cents, shipping_address, stripe_session_id, created_ts, updated_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.stripe_session_id.clone(), now, now],
+            "INSERT INTO orders (id, user_id, total_cents, shipping_address, stripe_session_id, created_ts, updated_ts, shipping_cents, shipping_carrier, shipping_service, estimated_delivery_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            libsql::params![id.clone(), data.user_id.clone(), data.total_cents, shipping_json, data.stripe_session_id.clone(), now, now, data.shipping_cents.unwrap_or(0), data.shipping_carrier, data.shipping_service, data.estimated_delivery_days],
         )
         .await
         .map_err(AppError::from)?;
@@ -305,6 +324,38 @@ impl Order {
             WHERE id = ?
             "#,
             libsql::params![tracking_number.to_string(), shippo_tracker_id.map(|s| s.to_string()), now, id.to_string()],
+        )
+        .await
+        .map_err(AppError::from)?;
+
+        Self::find_by_id(conn, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Order not found".to_string()))
+    }
+
+    pub async fn set_label(
+        conn: &Connection,
+        id: &str,
+        tracking_number: &str,
+        label_url: &str,
+        carrier: Option<&str>,
+    ) -> AppResult<Self> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        conn.execute(
+            r#"
+            UPDATE orders SET
+                tracking_number = ?,
+                label_url = ?,
+                shipping_carrier = COALESCE(?, shipping_carrier),
+                status = 'processing',
+                updated_ts = ?
+            WHERE id = ?
+            "#,
+            libsql::params![tracking_number.to_string(), label_url.to_string(), carrier.map(|s| s.to_string()), now, id.to_string()],
         )
         .await
         .map_err(AppError::from)?;

@@ -27,6 +27,12 @@ Recent changes to get you up to speed:
 | **Style image linking** | Styles can link to product images. Selecting a style moves carousel to that image. Images are moved to style folders in R2. |
 | **Style-aware notifications** | Customers can subscribe to specific style restocks. Restock emails list which styles are available. |
 | **Drag-to-reorder styles** | Admin can reorder styles via drag-and-drop. Visual image picker for linking images to styles. |
+| **Real-time shipping rates** | Checkout shows live Shippo rates. Customer selects carrier/service before payment. Rates calculated from product dimensions. |
+| **Product dimensions** | Products have weight (grams), length/width/height (cm) for accurate shipping. Defaults: 500g, 15x15x10cm. |
+| **Shop origin address** | Admin SHIPPING tab configures ship-from address. Supports metric (g/cm) or US (oz/in) units. |
+| **Label purchasing** | Admin can buy shipping labels directly. BUY LABEL button shows rates, purchases label, auto-saves tracking. |
+| **Print label** | After purchase, PRINT LABEL button opens PDF. Label URL stored on order for reprinting. |
+| **Shippo webhooks** | `track_updated` events auto-update order status (shipped → delivered) and send delivery emails. |
 
 ### Key Files to Know
 
@@ -45,7 +51,8 @@ Recent changes to get you up to speed:
 | `src/models/product_notification.rs` | Product restock notification subscriptions |
 | `src/models/product_style.rs` | Product styles/variants model |
 | `src/services/stripe.rs` | Stripe API client (payments, products, checkout) |
-| `src/services/shippo.rs` | Shippo API client (shipping tracking) |
+| `src/services/shippo.rs` | Shippo API client (rates, labels, tracking) |
+| `src/routes/shipping.rs` | Public shipping rates endpoint |
 | `src/services/jwks.rs` | JWKS verifier for Clerk JWT authentication |
 | `src/services/rate_limiter.rs` | Upstash Redis rate limiter |
 | `src/models/product.rs` | Product and ProductImage models |
@@ -63,7 +70,8 @@ Recent changes to get you up to speed:
 | Cloudflare R2 | Nothing needed | Free tier: 10GB storage, 10M reads/month |
 | Stripe | Configure production webhook | https://dashboard.stripe.com/webhooks → Add `https://caterpillarclay.com/api/webhooks/stripe` |
 | Stripe | Switch to live API keys | Replace `sk_test_` / `pk_test_` with `sk_live_` / `pk_live_` |
-| Shippo | Configure webhook for tracking updates | https://apps.goshippo.com/settings/webhooks → Add `https://caterpillarclay.com/api/webhooks/shippo` with `track_updated` event |
+| Shippo | Configure webhook for tracking/labels | https://apps.goshippo.com/settings/webhooks → Add `https://caterpillarclay.com/api/webhooks/shippo` with "All Events" |
+| Shippo | Configure shop origin address | Admin → SHIPPING tab → Enter ship-from address |
 | Shippo | Switch to live API key | Replace `shippo_test_` with `shippo_live_` |
 
 ## Architecture
@@ -323,6 +331,10 @@ turso db create caterpillar-clay-test --from-db caterpillar-clay
 | is_active | INTEGER | 1 = visible in storefront |
 | stripe_product_id | TEXT | Stripe product ID (prod_xxx) |
 | stripe_price_id | TEXT | Stripe price ID (price_xxx) |
+| weight_grams | INTEGER | Product weight in grams (for shipping) |
+| length_cm | REAL | Package length in cm |
+| width_cm | REAL | Package width in cm |
+| height_cm | REAL | Package height in cm |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
 
@@ -347,6 +359,11 @@ turso db create caterpillar-clay-test --from-db caterpillar-clay
 | shippo_tracker_id | TEXT | Shippo tracker ID |
 | stripe_session_id | TEXT | Stripe checkout session ID |
 | stripe_payment_intent_id | TEXT | Stripe payment intent ID (for refunds) |
+| shipping_cents | INTEGER | Shipping cost in cents |
+| shipping_carrier | TEXT | Carrier name (USPS, FedEx, etc.) |
+| shipping_service | TEXT | Service level (Priority, Ground, etc.) |
+| estimated_delivery_days | INTEGER | Estimated delivery time |
+| label_url | TEXT | Shippo label PDF URL |
 | created_ts | INTEGER | Unix timestamp |
 | updated_ts | INTEGER | Unix timestamp |
 

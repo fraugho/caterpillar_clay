@@ -21,6 +21,12 @@ pub struct CartItem {
 pub struct CheckoutRequest {
     pub items: Vec<CartItem>,
     pub shipping_address: ShippingAddress,
+    // Shipping selection
+    pub shipping_rate_id: Option<String>,
+    pub shipping_cents: Option<i32>,
+    pub shipping_carrier: Option<String>,
+    pub shipping_service: Option<String>,
+    pub estimated_delivery_days: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -77,6 +83,10 @@ async fn create_checkout(
         });
     }
 
+    // Add shipping cost to total
+    let shipping_cents = payload.shipping_cents.unwrap_or(0);
+    total_cents += shipping_cents;
+
     // Build checkout items with product details
     let mut checkout_items: Vec<CheckoutItem> = Vec::new();
     for item in &payload.items {
@@ -107,6 +117,25 @@ async fn create_checkout(
         });
     }
 
+    // Add shipping as a line item if selected
+    if shipping_cents > 0 {
+        let shipping_description = payload.estimated_delivery_days
+            .map(|d| format!("Estimated {} days", d));
+        let shipping_name = match (&payload.shipping_carrier, &payload.shipping_service) {
+            (Some(carrier), Some(service)) => format!("{} - {}", carrier, service),
+            (Some(carrier), None) => format!("{} Shipping", carrier),
+            _ => "Shipping".to_string(),
+        };
+
+        checkout_items.push(CheckoutItem {
+            name: shipping_name,
+            description: shipping_description,
+            images: None,
+            price_cents: shipping_cents as i64,
+            quantity: 1,
+        });
+    }
+
     // Create order in pending state (without session ID initially)
     let order = Order::create(
         &conn,
@@ -116,6 +145,11 @@ async fn create_checkout(
             shipping_address: payload.shipping_address,
             stripe_session_id: None,
             items: order_items,
+            // Shipping details
+            shipping_cents: Some(shipping_cents),
+            shipping_carrier: payload.shipping_carrier,
+            shipping_service: payload.shipping_service,
+            estimated_delivery_days: payload.estimated_delivery_days,
         },
     )
     .await?;
