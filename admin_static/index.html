@@ -1803,9 +1803,12 @@
                     }
                 },
 
-                logout(e) {
+                async logout(e) {
                     // Guard against Firefox bfcache auto-triggering
                     if (!e || !e.isTrusted) return;
+                    if (window.Clerk) {
+                        await window.Clerk.signOut();
+                    }
                     window.location.href = '/';
                 }
             };
