@@ -18,6 +18,11 @@ use crate::storage::{LocalStorage, R2Storage, StorageBackend};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Install rustls crypto provider before any TLS connections
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
