@@ -11,7 +11,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://pub-f9dc52aa76394755bd5c41e7c3f3ea07.r2.dev" crossorigin>
 
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" href="/favicon.png" id="favicon">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <script>
         fetch('/api/site').then(r=>r.json()).then(d=>{if(d.favicon)document.getElementById('favicon').href=d.favicon});
     </script>
