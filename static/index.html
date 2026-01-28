@@ -3,16 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Handmade pottery and clay art by Alex aka Caterpillar Clay. Unique ceramic pieces crafted with care.">
     <title>Caterpillar Clay</title>
+
+    <!-- Preconnect to critical origins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://pub-f9dc52aa76394755bd5c41e7c3f3ea07.r2.dev" crossorigin>
+
     <link rel="icon" type="image/png" href="/favicon.png" id="favicon">
     <script>
         fetch('/api/site').then(r=>r.json()).then(d=>{if(d.favicon)document.getElementById('favicon').href=d.favicon});
     </script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <!-- Clerk -->
-    <script async crossorigin="anonymous" data-clerk-publishable-key="pk_test_Y2FyaW5nLWpheWJpcmQtODYuY2xlcmsuYWNjb3VudHMuZGV2JA" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
     <style>
         :root{
             --bg-primary:#F8F8F8;
@@ -56,7 +61,9 @@
         [x-cloak]{display:none !important}
         .loading{opacity:0.6;pointer-events:none}
         .product-img{width:100%;height:380px;object-fit:cover;background:var(--bg-secondary);border:2px solid var(--border);border-radius:8px;margin-bottom:12px;transition:transform .2s}
-        .product-card{cursor:none;transition:transform .2s,box-shadow .2s;will-change:transform;backface-visibility:hidden}
+        .product-card{cursor:none;transition:transform .2s,box-shadow .2s;will-change:transform;backface-visibility:hidden;min-height:520px}
+        nav{min-height:60px}
+        main{min-height:600px}
         .product-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
         .product-card:hover .product-img{transform:scale(1.02)}
         .order-card{background:var(--bg-card);padding:16px;margin-bottom:12px;border:2px solid var(--border);border-radius:12px}
@@ -313,10 +320,10 @@
             <div class="card" style="padding:32px">
                 <h2 style="font-size:14px;margin-bottom:24px">Fresh from the Kiln</h2>
                 <div :class="{ loading: loadingProducts }" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px">
-                    <template x-for="p in products" :key="p.id">
-                        <div class="card product-card" style="padding:20px;text-align:center" @click="navigateToProduct(p)" x-data="{ imgLoaded: false }" x-show="imgLoaded || !p.images || p.images.length === 0" x-transition.opacity.duration.200ms>
+                    <template x-for="(p, idx) in products" :key="p.id">
+                        <div class="card product-card" style="padding:20px;text-align:center" @click="navigateToProduct(p)">
                             <template x-if="p.images && p.images.length > 0">
-                                <img :src="p.images[0]" :alt="p.name" class="product-img" @load="imgLoaded = true">
+                                <img :src="p.images[0]" :alt="p.name" class="product-img" :fetchpriority="idx === 0 ? 'high' : 'auto'" loading="lazy" :loading="idx === 0 ? 'eager' : 'lazy'">
                             </template>
                             <template x-if="!p.images || p.images.length === 0">
                                 <div class="product-img" style="display:flex;align-items:center;justify-content:center;font-size:10px">[IMAGE]</div>
@@ -836,8 +843,22 @@
                     history.pushState({ page: pageName }, '', url);
                 },
 
+                async loadClerkScript(){
+                    if(window.Clerk) return;
+                    return new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
+                        script.crossOrigin = 'anonymous';
+                        script.dataset.clerkPublishableKey = 'pk_test_Y2FyaW5nLWpheWJpcmQtODYuY2xlcmsuYWNjb3VudHMuZGV2JA';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                },
+
                 async initClerk(){
                     try {
+                        await this.loadClerkScript();
                         await window.Clerk.load();
                         this.user = window.Clerk.user;
                         if(this.user){
@@ -873,6 +894,7 @@
                 },
 
                 async signOut(){
+                    await this.loadClerkScript();
                     if(window.Clerk){
                         await window.Clerk.signOut();
                         this.user = null;

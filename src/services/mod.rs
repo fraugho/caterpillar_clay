@@ -1,5 +1,6 @@
 pub mod clerk;
 pub mod email;
+pub mod image;
 pub mod jwks;
 pub mod rate_limiter;
 pub mod resend;

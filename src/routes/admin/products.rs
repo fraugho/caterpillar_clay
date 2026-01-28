@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 use crate::models::{CreateProduct, Product, ProductImage, ProductNotification, ProductStyle, UpdateProduct};
 use crate::routes::AppState;
+use crate::services::image::process_image;
 
 /// Sanitize a style name for use in folder paths
 fn sanitize_style_name(name: &str) -> String {
@@ -587,10 +588,34 @@ async fn upload_image(
             AppError::BadRequest(format!("Failed to read upload: {}", e))
         })?;
 
+        // Process image (resize if too large)
+        let (upload_data, upload_filename) = if content_type.starts_with("image/")
+            && extension != "svg"
+        {
+            match process_image(&data, &extension) {
+                Ok(processed) => {
+                    // Update filename with new extension if changed
+                    let new_filename = if processed.extension != extension {
+                        let base = filename.rsplit_once('.').map(|(b, _)| b).unwrap_or(&filename);
+                        format!("{}.{}", base, processed.extension)
+                    } else {
+                        filename.clone()
+                    };
+                    (processed.data, new_filename)
+                }
+                Err(e) => {
+                    tracing::warn!("Image processing failed, using original: {}", e);
+                    (data.to_vec(), filename.clone())
+                }
+            }
+        } else {
+            (data.to_vec(), filename.clone())
+        };
+
         // Upload to storage in product folder
         let path = state
             .storage
-            .upload_to_folder(&id, &filename, &data)
+            .upload_to_folder(&id, &upload_filename, &upload_data)
             .await
             .map_err(|e| AppError::Storage(e.to_string()))?;
 

@@ -30,3 +30,4 @@ hex = "0.4"
 hmac = "0.12"
 redis = { version = "1.0.2", features = ["tokio-comp", "tokio-rustls-comp"] }
 rustls = { version = "0.23", features = ["ring"] }
+image = "0.25"
