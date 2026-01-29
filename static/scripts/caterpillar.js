@@ -8,6 +8,9 @@
     const shadowColor = '#7BA3C9';
     const legColor = '#5a6a7a';
 
+    // Detect touch device
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
     // Restore state from sessionStorage
     const saved = JSON.parse(sessionStorage.getItem('caterpillar') || 'null');
     let posX = saved?.posX || 100, posY = saved?.posY || 100;
@@ -90,10 +93,27 @@
         }
     }
 
-    document.addEventListener('mousemove', e => {
-        mouseX = e.clientX;
-        mouseY = e.clientY;
-    });
+    // Desktop: follow mouse
+    if (!isTouchDevice) {
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+    }
+
+    // Mobile: only move when tapping interactive elements
+    if (isTouchDevice) {
+        document.addEventListener('click', e => {
+            const target = e.target.closest('a, button, [role="button"], .btn, .product-card');
+            if (target) {
+                const rect = target.getBoundingClientRect();
+                mouseX = rect.left + rect.width / 2;
+                mouseY = rect.top + rect.height / 2;
+                idleTime = 0;
+                idleAnim = null;
+            }
+        });
+    }
 
     function update(ts) {
         const dt = lastTS ? (ts - lastTS) / 1000 : .016;
