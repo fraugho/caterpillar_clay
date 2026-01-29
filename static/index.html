@@ -109,6 +109,11 @@
         @media(max-width:768px){
             .detail-carousel{height:300px;margin:0 auto 20px}
             .detail-content>div{margin-top:20px !important}
+            nav{height:60px;padding:0 12px}
+            nav .nav-links{gap:8px !important;font-size:7px !important}
+            nav .nav-title{font-size:10px !important;margin-left:-20px}
+            nav .nav-right{gap:0 !important;font-size:7px !important;min-width:auto !important;margin-left:24px}
+            .auth-btn{padding:6px 8px;font-size:6px}
         }
     </style>
 </head>
@@ -292,11 +297,11 @@
 
     <nav style="background:#97BAD9;position:relative;z-index:1001">
         <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
-            <div style="flex:1;display:flex;gap:16px;font-size:10px">
+            <div class="nav-links" style="flex:1;display:flex;gap:16px;font-size:10px">
                 <a href="/about.html" style="color:#fff;text-decoration:none">ABOUT ME</a>
             </div>
-            <a href="#" @click.prevent="navigateToPage('home')" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
-            <div style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end;min-width:200px">
+            <a href="#" @click.prevent="navigateToPage('home')" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <div class="nav-right" style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end;min-width:200px">
                 <a href="#" @click.prevent="navigateToPage('cart')" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount">0</span>)</a>
                 <button class="auth-btn" x-show="!user" @click="signIn()">SIGN IN</button>
                 <div class="user-menu" x-show="user" style="display:none">

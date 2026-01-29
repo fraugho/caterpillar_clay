@@ -42,6 +42,11 @@
         @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
         nav{background:var(--accent);padding:0 20px;position:relative;z-index:10;height:70px;display:flex;align-items:center}
         nav a{color:#fff;text-decoration:none;font-size:12px}
+        @media(max-width:768px){
+            nav{height:60px;padding:0 12px}
+            nav a{font-size:10px}
+            nav a:last-child{font-size:8px}
+        }
         .container{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;position:relative;z-index:10}
         .account-card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px;max-width:800px;width:100%}
         #clerk-profile{display:flex;justify-content:center}
