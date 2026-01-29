@@ -106,10 +106,13 @@
         .qty-btn.minus{border-radius:8px 0 0 8px}
         .qty-btn.plus{border-radius:0 8px 8px 0}
         .qty-display{background:var(--bg-secondary);color:var(--text-primary);padding:14px 20px;font-family:inherit;font-size:10px;border-top:2px solid var(--border);border-bottom:2px solid var(--border);min-width:50px;text-align:center}
+        .mobile-only{display:none}
         @media(max-width:768px){
             .detail-carousel{height:300px;margin:0 auto 20px}
             .detail-content>div{margin-top:20px !important}
             .nav-title{font-size:10px !important}
+            .desktop-only{display:none}
+            .mobile-only{display:inline}
         }
     </style>
 </head>
@@ -398,9 +401,9 @@
                     SIGN IN / CREATE ACCOUNT
                 </a>
                 <div x-show="user" style="margin-top:24px;text-align:center">
-                    <a href="/account.html" style="color:var(--accent);font-size:10px;text-decoration:none">ACCOUNT SETTINGS</a>
+                    <a href="/account.html" style="color:var(--accent);font-size:10px;text-decoration:none"><span class="desktop-only">ACCOUNT SETTINGS</span><span class="mobile-only">ACCOUNT</span></a>
                     <span style="color:var(--text-secondary);font-size:10px;margin:0 8px">|</span>
-                    <a href="#" @click.prevent="signOut()" style="color:var(--accent);font-size:10px;text-decoration:none">SIGN OUT</a>
+                    <a href="#" @click.prevent="signOut()" style="color:var(--accent);font-size:10px;text-decoration:none"><span class="desktop-only">SIGN OUT</span><span class="mobile-only">LOGOUT</span></a>
                 </div>
             </div>
         </template>
