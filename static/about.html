@@ -46,14 +46,7 @@
         .star.twinkle{animation:twinkle 2s ease-in-out infinite}
         @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
         nav{height:70px;padding:0 20px;display:flex;align-items:center}
-        nav a{color:#fff;text-decoration:none}
-        .auth-btn{background:transparent;border:2px solid #fff;color:#fff;padding:8px 12px;font-family:inherit;font-size:8px;cursor:pointer;border-radius:6px;width:auto}
-        .auth-btn:hover{background:rgba(255,255,255,0.1)}
-        .user-menu{position:relative}
-        .user-dropdown{display:none;position:absolute;right:0;top:100%;background:#5a8ab5;padding:8px;min-width:150px;z-index:100;border-radius:8px;margin-top:8px}
-        .user-dropdown.show{display:block}
-        .user-dropdown a{display:block;color:#fff;text-decoration:none;padding:8px;font-size:8px;border-radius:4px}
-        .user-dropdown a:hover{background:#4a7a9f}
+        nav{height:60px;padding:0 12px;display:flex;align-items:center}
         [x-cloak]{display:none !important}
         .container{max-width:900px;margin:40px auto;padding:0 20px;position:relative;z-index:10}
         .card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px}
@@ -64,38 +57,17 @@
         @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         .img-skeleton{width:100%;max-width:400px;height:400px;margin:0 auto 32px}
         .text-skeleton{height:120px;max-width:600px;margin:0 auto}
-        @media(max-width:768px){
-            nav{height:60px;padding:0 12px}
-            nav .nav-links{gap:8px !important;font-size:7px !important}
-            nav .nav-title{font-size:10px !important}
-            nav .nav-right{gap:0 !important;font-size:7px !important;min-width:auto !important}
-            nav .nav-right .auth-btn,nav .nav-right .user-menu{display:none !important}
-        }
-    </style>
+            </style>
 </head>
 <body x-data="artistPage()">
     <div class="stars" id="stars"></div>
     <canvas id="caterpillar" width="72" height="40"></canvas>
 
-    <nav style="background:#97BAD9;position:relative;z-index:1001">
-        <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
-            <div class="nav-links" style="flex:1;display:flex;gap:16px;font-size:10px">
-                <a href="/about.html" style="color:#fff;text-decoration:none">ABOUT ME</a>
-            </div>
-            <a href="/" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
-            <div class="nav-right" style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end;min-width:200px">
-                <a href="/" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount">0</span>)</a>
-                <button class="auth-btn" x-show="!user" @click="signIn()">SIGN IN</button>
-                <div class="user-menu" x-show="user" style="display:none">
-                    <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user?.firstName || 'Account'"></button>
-                    <div class="user-dropdown" :class="{ show: showUserMenu }">
-                        <a href="/">My Orders</a>
-                        <a href="/account.html">Account Settings</a>
-                        <a href="/gallium/" x-show="user?.publicMetadata?.isAdmin">Admin Panel</a>
-                        <a href="#" @click.prevent="signOut()">Sign Out</a>
-                    </div>
-                </div>
-            </div>
+    <nav style="background:#97BAD9;position:relative;z-index:1001;height:60px;padding:0 12px">
+        <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
+            <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
+            <a href="/" style="font-size:10px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <a href="/" style="color:#fff;text-decoration:none;font-size:8px">CART (<span x-text="cartItemCount">0</span>)</a>
         </div>
     </nav>
 

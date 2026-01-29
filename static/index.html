@@ -106,17 +106,9 @@
         .qty-btn.minus{border-radius:8px 0 0 8px}
         .qty-btn.plus{border-radius:0 8px 8px 0}
         .qty-display{background:var(--bg-secondary);color:var(--text-primary);padding:14px 20px;font-family:inherit;font-size:10px;border-top:2px solid var(--border);border-bottom:2px solid var(--border);min-width:50px;text-align:center}
-        /* Mobile sign in link - only shows on mobile in cart */
-        .mobile-sign-in{display:none}
         @media(max-width:768px){
             .detail-carousel{height:300px;margin:0 auto 20px}
             .detail-content>div{margin-top:20px !important}
-            nav{height:60px;padding:0 12px}
-            nav .nav-links{gap:8px !important;font-size:7px !important}
-            nav .nav-title{font-size:10px !important}
-            nav .nav-right{gap:0 !important;font-size:7px !important;min-width:auto !important}
-            nav .nav-right .auth-btn,nav .nav-right .user-menu{display:none !important}
-            .mobile-sign-in{display:block}
         }
     </style>
 </head>
@@ -298,25 +290,11 @@
         </div>
     </template>
 
-    <nav style="background:#97BAD9;position:relative;z-index:1001">
-        <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
-            <div class="nav-links" style="flex:1;display:flex;gap:16px;font-size:10px">
-                <a href="/about.html" style="color:#fff;text-decoration:none">ABOUT ME</a>
-            </div>
-            <a href="#" @click.prevent="navigateToPage('home')" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
-            <div class="nav-right" style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end;min-width:200px">
-                <a href="#" @click.prevent="navigateToPage('cart')" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount">0</span>)</a>
-                <button class="auth-btn" x-show="!user" @click="signIn()">SIGN IN</button>
-                <div class="user-menu" x-show="user" style="display:none">
-                    <button class="auth-btn" @click="showUserMenu = !showUserMenu" x-text="user?.firstName || 'Account'"></button>
-                    <div class="user-dropdown" :class="{ show: showUserMenu }">
-                        <a href="#" @click.prevent="navigateToPage('orders')">My Orders</a>
-                        <a href="/account.html">Account Settings</a>
-                        <a href="/gallium/" x-show="user?.isAdmin">Admin Panel</a>
-                        <a href="#" @click.prevent="signOut()">Sign Out</a>
-                    </div>
-                </div>
-            </div>
+    <nav style="background:#97BAD9;position:relative;z-index:1001;height:60px;padding:0 12px">
+        <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
+            <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
+            <a href="#" @click.prevent="navigateToPage('home')" style="font-size:10px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <a href="#" @click.prevent="navigateToPage('cart')" style="color:#fff;text-decoration:none;font-size:8px">CART (<span x-text="cartItemCount">0</span>)</a>
         </div>
     </nav>
 
@@ -414,13 +392,15 @@
                         <button class="btn" @click="navigateToPage('checkout');step=1">CHECKOUT</button>
                     </div>
                 </template>
-                <!-- Mobile sign in / account links -->
-                <a href="/login.html" class="mobile-sign-in" style="display:none;margin-top:24px;text-align:center;color:var(--accent);font-size:10px;text-decoration:none" x-show="!user">
+                <!-- Sign in / account links -->
+                <a href="/login.html" style="display:block;margin-top:24px;text-align:center;color:var(--accent);font-size:10px;text-decoration:none" x-show="!user">
                     SIGN IN / CREATE ACCOUNT
                 </a>
-                <a href="/account.html" class="mobile-sign-in" style="display:none;margin-top:24px;text-align:center;color:var(--accent);font-size:10px;text-decoration:none" x-show="user">
-                    ACCOUNT SETTINGS
-                </a>
+                <div x-show="user" style="margin-top:24px;text-align:center">
+                    <a href="/account.html" style="color:var(--accent);font-size:10px;text-decoration:none">ACCOUNT SETTINGS</a>
+                    <span style="color:var(--text-secondary);font-size:10px;margin:0 8px">|</span>
+                    <a href="#" @click.prevent="signOut()" style="color:var(--accent);font-size:10px;text-decoration:none">SIGN OUT</a>
+                </div>
             </div>
         </template>
 
