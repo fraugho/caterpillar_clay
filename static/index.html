@@ -123,7 +123,7 @@
 
     <!-- Product Detail Overlay -->
     <template x-if="selectedProduct && !initializing">
-        <div class="detail-overlay" x-data="{ detailIdx: 0, imgReady: false, selectedStyleId: null, get selectedStyle() { return selectedStyleId ? (selectedProduct.styles || []).find(s => s.id === selectedStyleId) : null; }, get hasStyles() { return selectedProduct.styles && selectedProduct.styles.length > 0; }, get stockInfo() { if (this.hasStyles) { if (!this.selectedStyle) { const total = selectedProduct.styles.reduce((sum, s) => sum + s.stock_quantity, 0); return { quantity: total, text: total > 0 ? 'Select a style' : 'Out of Stock' }; } return { quantity: this.selectedStyle.stock_quantity, text: this.selectedStyle.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } return { quantity: selectedProduct.stock_quantity, text: selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))" @style-select.window="if($event.detail.productId === selectedProduct.id && $event.detail.imageIndex !== undefined) detailIdx = $event.detail.imageIndex">
+        <div class="detail-overlay" x-data="{ detailIdx: 0, imgReady: false, selectedStyleId: null, get selectedStyle() { return this.selectedStyleId ? (selectedProduct.styles || []).find(s => s.id === this.selectedStyleId) : null; }, get hasStyles() { return selectedProduct.styles && selectedProduct.styles.length > 0; }, get stockInfo() { if (this.hasStyles) { if (!this.selectedStyle) { const total = selectedProduct.styles.reduce((sum, s) => sum + s.stock_quantity, 0); return { quantity: total, text: total > 0 ? 'Select a style' : 'Out of Stock' }; } return { quantity: this.selectedStyle.stock_quantity, text: this.selectedStyle.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } return { quantity: selectedProduct.stock_quantity, text: selectedProduct.stock_quantity > 0 ? 'In Stock' : 'Out of Stock' }; } }" x-init="$nextTick(() => window.generateStarsIn($el.querySelector('.stars')))" @style-select.window="if($event.detail.productId === selectedProduct.id && $event.detail.imageIndex !== undefined) detailIdx = $event.detail.imageIndex">
             <div class="stars"></div>
             <div class="detail-content">
                 <div style="max-width:900px;margin:0 auto;padding:0 20px">
@@ -162,7 +162,7 @@
                         <template x-if="hasStyles">
                             <div style="max-width:700px;margin:0 auto 28px;display:block">
                                 <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;text-align:center">Select Style:</p>
-                                <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
+                                <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:24px">
                                     <template x-for="style in selectedProduct.styles" :key="style.id">
                                         <button
                                             :style="{
@@ -185,6 +185,10 @@
                                             <span style="font-size:7px;display:block" :style="{ color: style.stock_quantity > 0 ? (selectedStyleId === style.id ? '#18191B' : '#22c55e') : '#ef4444' }" x-text="style.stock_quantity > 0 ? style.stock_quantity + ' available' : 'Out of Stock'"></span>
                                         </button>
                                     </template>
+                                </div>
+                                <!-- Add to Cart for styles -->
+                                <div x-show="selectedStyleId" x-transition style="max-width:500px;margin:0 auto">
+                                    <button class="btn" style="padding:18px 24px;font-size:10px;width:100%" @click="addToCartWithStyle(selectedProduct, selectedStyleId, selectedStyle ? selectedStyle.name : '')">ADD TO CART</button>
                                 </div>
                             </div>
                         </template>
@@ -226,44 +230,6 @@
                             </div>
                         </template>
 
-                        <!-- Has styles: show add to cart or notify based on selected style -->
-                        <template x-if="hasStyles && selectedStyle && selectedStyle.stock_quantity > 0">
-                            <div style="max-width:500px;margin:0 auto">
-                                <template x-if="getCartQuantity(selectedProduct.id, selectedStyleId) === 0">
-                                    <button class="btn" style="padding:18px 24px;font-size:10px;width:100%" @click="addToCartWithStyle(selectedProduct, selectedStyleId, selectedStyle.name)">ADD TO CART</button>
-                                </template>
-                                <template x-if="getCartQuantity(selectedProduct.id, selectedStyleId) > 0">
-                                    <div class="qty-controls">
-                                        <button class="qty-btn minus" style="padding:18px 24px" @click="updateCartQuantity(selectedProduct.id, -1, selectedStyleId)">-</button>
-                                        <span class="qty-display" style="padding:18px 24px;font-size:12px" x-text="getCartQuantity(selectedProduct.id, selectedStyleId)"></span>
-                                        <button class="qty-btn plus" style="padding:18px 24px" @click="addToCartWithStyle(selectedProduct, selectedStyleId, selectedStyle.name)">+</button>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <template x-if="hasStyles && selectedStyle && selectedStyle.stock_quantity === 0">
-                            <div style="max-width:500px;margin:0 auto">
-                                <template x-if="notifyProductId !== selectedProduct.id && !isStyleNotified(selectedProduct.id, selectedStyleId)">
-                                    <button class="btn" style="background:#f59e0b;color:#18191B;padding:18px 24px;font-size:10px;width:100%" @click="showNotifyForm(selectedProduct.id, selectedStyleId)">NOTIFY ME WHEN AVAILABLE</button>
-                                </template>
-                                <template x-if="isStyleNotified(selectedProduct.id, selectedStyleId)">
-                                    <button class="btn" style="background:#22c55e;padding:18px 24px;font-size:10px;width:100%" disabled>YOU'LL BE NOTIFIED</button>
-                                </template>
-                                <template x-if="notifyProductId === selectedProduct.id">
-                                    <div style="text-align:center">
-                                        <p style="font-size:10px;margin-bottom:16px;color:var(--text-secondary)">Get notified when <span x-text="selectedStyle.name"></span> is back in stock</p>
-                                        <input type="email" x-model="notifyEmail" placeholder="your@email.com" style="margin-bottom:12px">
-                                        <div style="display:flex;gap:12px">
-                                            <button class="btn" style="flex:1;background:var(--border);color:var(--text-primary)" @click="closeNotifyForm()">CANCEL</button>
-                                            <button class="btn" style="flex:1" @click="subscribeStyleNotify(selectedProduct.id, selectedStyleId)" :disabled="notifyingProduct || !notifyEmail">
-                                                <span x-text="notifyingProduct ? 'SUBSCRIBING...' : 'NOTIFY ME'"></span>
-                                            </button>
-                                        </div>
-                                        <p x-show="notifyMessage" x-text="notifyMessage" style="font-size:8px;margin-top:12px" :style="{ color: notifySuccess ? '#22c55e' : '#ef4444' }"></p>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
                     </div>
                 </div>
 
