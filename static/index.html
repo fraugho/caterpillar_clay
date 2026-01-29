@@ -285,17 +285,22 @@
                             <p style="font-size:10px;margin-bottom:10px" x-text="p.name"></p>
                             <p style="font-size:12px;color:var(--accent);margin-bottom:10px">$<span x-text="p.price.toFixed(2)"></span></p>
                             <p style="font-size:8px;color:var(--text-secondary);margin-bottom:14px" x-text="p.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'"></p>
-                            <template x-if="p.stock_quantity > 0 && getCartQuantity(p.id) === 0">
+                            <!-- Multiple styles: go to product page -->
+                            <template x-if="p.styles && p.styles.length > 1">
+                                <button class="btn" @click.stop="navigateToProduct(p)">SELECT STYLE</button>
+                            </template>
+                            <!-- No styles or 1 style: add to cart -->
+                            <template x-if="(!p.styles || p.styles.length <= 1) && p.stock_quantity > 0 && getCartQuantity(p.id) === 0">
                                 <button class="btn" @click.stop="addToCart(p)">ADD TO CART</button>
                             </template>
-                            <template x-if="p.stock_quantity > 0 && getCartQuantity(p.id) > 0">
+                            <template x-if="(!p.styles || p.styles.length <= 1) && p.stock_quantity > 0 && getCartQuantity(p.id) > 0">
                                 <div class="qty-controls" @click.stop>
                                     <button class="qty-btn minus" @click.stop="updateCartQuantity(p.id, -1)">-</button>
                                     <span class="qty-display" x-text="getCartQuantity(p.id)"></span>
                                     <button class="qty-btn plus" @click.stop="addToCart(p)">+</button>
                                 </div>
                             </template>
-                            <template x-if="p.stock_quantity <= 0">
+                            <template x-if="(!p.styles || p.styles.length <= 1) && p.stock_quantity <= 0">
                                 <div @click.stop>
                                     <template x-if="notifyProductId !== p.id && !isProductNotified(p.id)">
                                         <button class="btn" style="background:#f59e0b;color:#18191B" @click.stop="showNotifyForm(p.id)">NOTIFY ME</button>
