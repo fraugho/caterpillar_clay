@@ -41,9 +41,11 @@
         .star.twinkle{animation:twinkle 2s ease-in-out infinite}
         @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
         nav{background:var(--accent);padding:0 20px;position:relative;z-index:10;height:70px;display:flex;align-items:center}
-        nav a{color:#fff;text-decoration:none;font-size:12px}
         @media(max-width:768px){
             nav{height:60px;padding:0 12px}
+            nav .nav-links{gap:8px !important;font-size:7px !important}
+            nav .nav-title{font-size:10px !important}
+            nav .nav-right{gap:0 !important;font-size:7px !important;min-width:auto !important}
             .container{padding:20px 12px}
             .account-card{padding:16px}
             /* Clerk root and cards - no scroll, grow to fit */
@@ -276,13 +278,19 @@
         }
     </style>
 </head>
-<body>
+<body x-data="{cart: JSON.parse(localStorage.getItem('cart') || '[]'), get cartItemCount() { return this.cart.reduce((a,b) => a + (b.quantity || 1), 0); }}">
     <div class="stars" id="stars"></div>
     <canvas id="caterpillar" width="72" height="40"></canvas>
 
-    <nav>
-        <div style="width:100%;max-width:900px;margin:auto;text-align:center">
-            <a href="/">CATERPILLAR CLAY</a>
+    <nav style="background:var(--accent);position:relative;z-index:1001">
+        <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff">
+            <div class="nav-links" style="flex:1;display:flex;gap:16px;font-size:10px">
+                <a href="/about.html" style="color:#fff;text-decoration:none">ABOUT ME</a>
+            </div>
+            <a href="/" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <div class="nav-right" style="flex:1;display:flex;gap:16px;font-size:10px;align-items:center;justify-content:flex-end">
+                <a href="/" style="color:#fff;text-decoration:none">CART (<span x-text="cartItemCount">0</span>)</a>
+            </div>
         </div>
     </nav>
 
