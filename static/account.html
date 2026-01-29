@@ -46,6 +46,99 @@
             nav{height:60px;padding:0 12px}
             nav a{font-size:10px}
             nav a:last-child{font-size:8px}
+            .container{padding:20px 12px}
+            .account-card{padding:16px}
+            /* Clerk root and cards - no scroll, grow to fit */
+            .cl-rootBox{font-size:6px !important;max-width:100% !important;overflow:visible !important}
+            .cl-card{padding:12px !important;max-width:100% !important;overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-cardBox{padding:0 !important;max-width:100% !important;overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-userProfile-root{max-width:100% !important;overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-pageScrollBox{max-width:100% !important;overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-scrollBox{max-width:100% !important;overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-modalContent{overflow:visible !important;height:auto !important;max-height:none !important}
+            .cl-formContainer{overflow:visible !important;height:auto !important}
+            .cl-main{overflow:visible !important;height:auto !important}
+            .account-card{overflow-x:hidden !important}
+            /* Headers */
+            .cl-headerTitle{font-size:9px !important}
+            .cl-headerSubtitle{font-size:5px !important}
+            /* All buttons */
+            .cl-button{font-size:6px !important;padding:8px 10px !important}
+            .cl-formButtonPrimary{font-size:9px !important;padding:12px 14px !important}
+            .cl-formButtonReset{font-size:6px !important}
+            .cl-profileSectionPrimaryButton{font-size:9px !important;padding:10px 14px !important}
+            /* Form elements */
+            .cl-formFieldInput{font-size:6px !important;padding:8px !important;min-height:36px !important}
+            .cl-formFieldLabel{font-size:6px !important}
+            .cl-formFieldHintText{font-size:5px !important}
+            /* Profile sections - larger titles */
+            .cl-profileSectionTitle{font-size:9px !important}
+            .cl-profileSectionTitleText{font-size:9px !important}
+            .cl-profileSectionContent{font-size:6px !important}
+            .cl-profileSectionItem,.cl-activeDeviceListItem,.cl-activeDevice{padding:8px !important;margin-bottom:6px !important}
+            /* Navbar */
+            .cl-navbar{padding:8px !important}
+            .cl-navbarButton{font-size:6px !important;padding:6px !important}
+            /* Accordion and other elements */
+            .cl-accordionTriggerButton{font-size:6px !important}
+            .cl-accordionContent{font-size:6px !important}
+            .cl-badge{font-size:4px !important;padding:2px 4px !important}
+            /* User preview - hide name, keep avatar */
+            .cl-userPreview{font-size:6px !important}
+            .cl-userPreviewMainIdentifier{display:none !important}
+            .cl-userPreviewSecondaryIdentifier{font-size:5px !important}
+            .cl-userPreviewTextContainer{display:none !important}
+            /* Connect account - wrap text */
+            .cl-socialButtonsBlockButton{font-size:6px !important;padding:8px !important;white-space:normal !important;word-wrap:break-word !important;height:auto !important;min-height:auto !important;flex-wrap:wrap !important}
+            .cl-socialButtonsBlockButtonText{font-size:6px !important;white-space:normal !important;overflow-wrap:break-word !important;word-break:break-word !important}
+            .cl-socialButtonsBlockButton span{white-space:normal !important;word-break:break-word !important}
+            .cl-socialButtonsBlockButton *{white-space:normal !important}
+            [class*="socialButtonsBlockButton"]{white-space:normal !important;height:auto !important}
+            [class*="socialButtonsBlockButton"] *{white-space:normal !important}
+            /* Connected accounts section button */
+            .cl-profileSection__connectedAccounts button{white-space:normal !important;height:auto !important;word-break:break-word !important}
+            .cl-profileSection__connectedAccounts button span{white-space:normal !important}
+            .cl-profileSection__connectedAccounts .cl-profileSectionPrimaryButton{white-space:normal !important;height:auto !important}
+            [class*="connectedAccounts"] button{white-space:normal !important;height:auto !important;line-height:1.4 !important}
+            [class*="connectedAccounts"] button *{white-space:normal !important}
+            /* Add email address - wrap text */
+            .cl-profileSectionPrimaryButton{white-space:normal !important;word-wrap:break-word !important;line-height:1.4 !important;height:auto !important;min-height:auto !important}
+            .cl-profileSectionPrimaryButton span{white-space:normal !important}
+            .cl-button{white-space:normal !important;height:auto !important}
+            /* Avatar */
+            .cl-avatarBox{width:48px !important;height:48px !important}
+            .cl-userButtonAvatarBox{width:32px !important;height:32px !important}
+            /* Page content */
+            .cl-pageScrollBox{padding:12px !important}
+            .cl-page{gap:12px !important}
+            /* Menus and actions */
+            .cl-menuButton{font-size:6px !important}
+            .cl-menuItem{font-size:6px !important}
+            .cl-actionCard{padding:10px !important}
+            /* Development mode - centered */
+            .cl-internal-b3fm6y,.cl-developmentMode,[class*="developmentMode"]{text-align:center !important;width:100% !important;display:flex !important;justify-content:center !important}
+            .cl-footer{text-align:center !important;display:flex !important;justify-content:center !important;width:100% !important}
+            .cl-footerAction{text-align:center !important;justify-content:center !important}
+            .cl-footerPages{text-align:center !important;justify-content:center !important;width:100% !important}
+            .cl-footerPagesLink{text-align:center !important}
+            [class*="footer"]{text-align:center !important}
+            .cl-userProfile-root .cl-footer,.cl-card .cl-footer{justify-content:center !important}
+            /* Delete section - centered */
+            #delete-section{text-align:center}
+            #delete-section h3{font-size:10px}
+            #delete-section p{font-size:6px}
+            #delete-section button{font-size:6px;padding:10px 14px}
+            /* Update profile closer to avatar */
+            .cl-profileSection__profile .cl-profileSectionContent{gap:8px !important}
+            .cl-profileSection__profile{gap:8px !important}
+            /* Account text in navbar larger */
+            .cl-navbarMobileMenuButton{font-size:8px !important}
+            .cl-userButtonTrigger{font-size:8px !important}
+            .cl-organizationSwitcherTrigger{font-size:8px !important}
+            .cl-navbarButton__account,.cl-navbarButton[data-localization-key*="account"]{font-size:8px !important}
+            #confirm-modal h3{font-size:10px}
+            #confirm-modal p{font-size:6px}
+            #confirm-modal button{font-size:6px;padding:10px 14px}
         }
         .container{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;position:relative;z-index:10}
         .account-card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px;max-width:800px;width:100%}
