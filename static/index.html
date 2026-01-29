@@ -109,6 +109,7 @@
         @media(max-width:768px){
             .detail-carousel{height:300px;margin:0 auto 20px}
             .detail-content>div{margin-top:20px !important}
+            .nav-title{font-size:10px !important}
         }
     </style>
 </head>
@@ -293,7 +294,7 @@
     <nav style="background:#97BAD9;position:relative;z-index:1001;height:60px;padding:0 12px">
         <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
             <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
-            <a href="#" @click.prevent="navigateToPage('home')" style="font-size:10px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <a href="#" @click.prevent="navigateToPage('home')" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
             <a href="#" @click.prevent="navigateToPage('cart')" style="color:#fff;text-decoration:none;font-size:8px">CART (<span x-text="cartItemCount">0</span>)</a>
         </div>
     </nav>

@@ -42,6 +42,7 @@
         @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
         nav{display:flex;align-items:center}
         @media(max-width:768px){
+            .nav-title{font-size:10px !important}
             .container{padding:20px 12px}
             .account-card{padding:16px}
             /* Clerk root and cards - no scroll, grow to fit */
@@ -281,7 +282,7 @@
     <nav style="background:var(--accent);position:relative;z-index:1001;height:60px;padding:0 12px">
         <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
             <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
-            <a href="/" style="font-size:10px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <a href="/" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
             <a href="/" style="color:#fff;text-decoration:none;font-size:8px">CART (<span x-text="cartItemCount">0</span>)</a>
         </div>
     </nav>

@@ -48,6 +48,9 @@
         nav{height:70px;padding:0 20px;display:flex;align-items:center}
         nav{height:60px;padding:0 12px;display:flex;align-items:center}
         [x-cloak]{display:none !important}
+        @media(max-width:768px){
+            .nav-title{font-size:10px !important}
+        }
         .container{max-width:900px;margin:40px auto;padding:0 20px;position:relative;z-index:10}
         .card{background:var(--bg-card);border:2px solid var(--border);border-radius:12px;padding:40px}
         .artist-img{width:100%;max-width:400px;border-radius:12px;border:2px solid var(--border);margin-bottom:32px}
@@ -66,7 +69,7 @@
     <nav style="background:#97BAD9;position:relative;z-index:1001;height:60px;padding:0 12px">
         <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
             <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
-            <a href="/" style="font-size:10px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
+            <a href="/" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
             <a href="/" style="color:#fff;text-decoration:none;font-size:8px">CART (<span x-text="cartItemCount">0</span>)</a>
         </div>
     </nav>
