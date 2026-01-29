@@ -135,7 +135,30 @@
         .carousel-dots{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px}
         .carousel-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);border:none;cursor:pointer}
         .carousel-dot.active{background:#fff}
-        @media(max-width:768px){.preview-section{grid-template-columns:1fr}}
+        @media(max-width:768px){
+            .preview-section{grid-template-columns:1fr}
+            /* Tabs - horizontal scroll */
+            .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+            .tabs::-webkit-scrollbar{height:4px}
+            .tabs::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px}
+            .tab{white-space:nowrap;flex-shrink:0}
+            /* Tables - horizontal scroll */
+            .card{overflow-x:auto;-webkit-overflow-scrolling:touch}
+            table{min-width:600px}
+            /* Stats - smaller on mobile */
+            .stats{grid-template-columns:repeat(2,1fr)}
+            .stat-value{font-size:14px}
+            .stat-label{font-size:6px}
+            /* Container */
+            .container{padding:12px}
+            /* Nav */
+            nav{padding:12px}
+            nav h1{font-size:10px}
+            nav .inner{flex-wrap:wrap;gap:8px}
+            /* Product grid */
+            .product-grid{grid-template-columns:1fr}
+            .product-card img,.product-card .placeholder-img,.product-card .carousel{height:280px}
+        }
     </style>
 </head>
 <body x-data="admin()">
