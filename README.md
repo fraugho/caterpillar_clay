@@ -27,7 +27,7 @@ Your admin panel is at:
 
 (Named after gallium - one of your favorite elements)
 
-Sign in with your account. Once logged in, you'll see the admin dashboard.
+Send me the email you want to be admin then you can. Sign in with your account. Once logged in, you'll see the admin dashboard.
 
 ---
 
