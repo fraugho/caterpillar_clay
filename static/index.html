@@ -116,7 +116,7 @@
         }
     </style>
 </head>
-<body x-data="shop()">
+<body x-data="shop()" :style="selectedProduct ? 'overflow:hidden' : ''">
 
     <div class="stars" id="stars"></div>
     <canvas id="caterpillar" width="72" height="40"></canvas>
@@ -278,7 +278,7 @@
         </div>
     </template>
 
-    <nav style="background:#97BAD9;position:relative;z-index:1001;height:60px;padding:0 12px">
+    <nav style="background:#97BAD9;position:fixed;top:0;left:0;right:0;z-index:1001;height:60px;padding:0 12px">
         <div style="width:100%;max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#fff;height:100%">
             <a href="/about.html" style="color:#fff;text-decoration:none;font-size:8px">ABOUT ME</a>
             <a href="#" @click.prevent="navigateToPage('home')" class="nav-title" style="font-size:14px;color:#fff;text-decoration:none;text-align:center">CATERPILLAR CLAY</a>
@@ -286,7 +286,7 @@
         </div>
     </nav>
 
-    <main x-cloak x-show="!initializing" style="max-width:900px;margin:40px auto;padding:0 20px">
+    <main x-cloak x-show="!initializing" style="max-width:900px;margin:40px auto;padding:60px 20px 0 20px">
         <!-- Home / Products -->
         <template x-if="page=='home'">
             <div class="card" style="padding:32px">
