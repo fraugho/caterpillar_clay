@@ -40,10 +40,10 @@
         }
         *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
         body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
-        #caterpillar{position:fixed;pointer-events:none;z-index:9999;will-change:transform;left:0;top:0}
-        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-        .star{position:absolute;background:#97BAD9;opacity:0.4}
-        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        #caterpillar{position:fixed;pointer-events:none;z-index:9999;will-change:transform;left:0;top:0;contain:strict}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;contain:strict}
+        .star{position:absolute;background:#97BAD9;opacity:0.4;contain:strict}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite;will-change:opacity}
         @keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:0.6}}
         nav{height:70px;padding:0 20px;display:flex;align-items:center}
         nav{height:60px;padding:0 12px;display:flex;align-items:center}
@@ -162,7 +162,7 @@
             const sizes=[2,3,4,6,8];
             for(let i=0;i<60;i++){
                 const star=document.createElement('div');
-                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                star.className='star'+(Math.random()>0.8?' twinkle':'');
                 const size=sizes[Math.floor(Math.random()*sizes.length)];
                 star.style.width=size+'px';
                 star.style.height=size+'px';

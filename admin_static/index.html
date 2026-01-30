@@ -35,9 +35,9 @@
         }
         *{margin:0;padding:0;box-sizing:border-box;image-rendering:pixelated}
         body{font-family:'Press Start 2P',cursive;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;position:relative}
-        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-        .star{position:absolute;background:var(--accent);opacity:0.3}
-        .star.twinkle{animation:twinkle 2s ease-in-out infinite}
+        .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;contain:strict}
+        .star{position:absolute;background:var(--accent);opacity:0.3;contain:strict}
+        .star.twinkle{animation:twinkle 2s ease-in-out infinite;will-change:opacity}
         @keyframes twinkle{0%,100%{opacity:0.15}50%{opacity:0.4}}
         .container{max-width:1200px;margin:0 auto;padding:20px;position:relative;z-index:1}
         nav{background:var(--accent);padding:20px;margin-bottom:20px;position:relative;z-index:1}
@@ -934,7 +934,7 @@
             const sizes=[2,3,4,6,8];
             for(let i=0;i<40;i++){
                 const star=document.createElement('div');
-                star.className='star'+(Math.random()>0.6?' twinkle':'');
+                star.className='star'+(Math.random()>0.8?' twinkle':'');
                 const size=sizes[Math.floor(Math.random()*sizes.length)];
                 star.style.width=size+'px';
                 star.style.height=size+'px';
