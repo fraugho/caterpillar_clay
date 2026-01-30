@@ -101,17 +101,13 @@
         });
     }
 
-    // Mobile: only move when tapping interactive elements
+    // Mobile: move to tap location
     if (isTouchDevice) {
         document.addEventListener('click', e => {
-            const target = e.target.closest('a, button, [role="button"], .btn, .product-card');
-            if (target) {
-                const rect = target.getBoundingClientRect();
-                mouseX = rect.left + rect.width / 2;
-                mouseY = rect.top + rect.height / 2;
-                idleTime = 0;
-                idleAnim = null;
-            }
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            idleTime = 0;
+            idleAnim = null;
         });
     }
 
